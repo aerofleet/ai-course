@@ -7,6 +7,8 @@ LangChain + OpenAI를 활용하여 AI 기능을 학습합니다.
 
 ```
 ai-course/
+├── .github/workflows/
+│   └── deploy.yml        # CI/CD 자동 배포 워크플로우
 ├── .env.example          # API 키 설정 예시
 ├── .env                  # 실제 API 키 (GitHub에 올라가지 않음)
 ├── .gitignore
@@ -81,7 +83,33 @@ LangChain은 컴퓨터가 사람처럼 글로 묻는 질문에 더 똑똑하게 
 ```
 
 1. 로컬에서 코드 작성 후 `git push`
-2. AI 서버에서 `git pull` 후 `python 파일명.py` 실행
+2. GitHub Actions가 자동으로 서버에 배포
+3. 서버에서 `python 파일명.py` 실행
+
+## CI/CD (GitHub Actions)
+
+`main` 브랜치에 push하면 GitHub Actions가 자동으로 AI 서버에 배포합니다.
+
+### 자동 배포 흐름
+
+```
+git push → GitHub Actions 실행 → SSH로 서버 접속 → git pull + pip install
+```
+
+### GitHub Secrets 설정
+
+레포 → Settings → Secrets and variables → Actions에 아래 값을 등록해야 합니다.
+
+| Secret | 설명 |
+|--------|------|
+| `SERVER_HOST` | AI 서버 IP |
+| `SERVER_USER` | SSH 접속 사용자명 |
+| `SSH_PRIVATE_KEY` | SSH 개인키 전체 내용 |
+| `OPENAI_API_KEY` | OpenAI API 키 |
+
+### 배포 확인
+
+GitHub 레포 → Actions 탭에서 배포 성공/실패 여부를 확인할 수 있습니다.
 
 ## 자주 발생하는 오류와 해결 방법
 
