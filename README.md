@@ -14,6 +14,7 @@ ai-course/
 ├── .gitignore
 ├── requirements.txt      # 필요한 패키지 목록
 ├── check_langchain.py    # LangChain 정상 작동 확인 스크립트
+├── assistant_chain.py    # 업무 어시스턴트 파이프라인 (Chain, Retriever, Tool, Memory)
 └── README.md
 ```
 
@@ -110,6 +111,59 @@ git push → GitHub Actions 실행 → SSH로 서버 접속 → git pull + pip i
 ### 배포 확인
 
 GitHub 레포 → Actions 탭에서 배포 성공/실패 여부를 확인할 수 있습니다.
+
+## 업무 어시스턴트 파이프라인 (assistant_chain.py)
+
+LangChain 핵심 요소 4가지를 활용한 업무 자동화 파이프라인입니다.
+
+### 파이프라인 흐름
+
+```
+텍스트 입력 → [Chain] 요약 → [Retriever] 문서 검색 → [Tool] 메일 전송
+                                                       [Memory] 대화 이력 저장
+```
+
+### LangChain 핵심 요소
+
+| 요소 | 역할 | 구현 |
+|------|------|------|
+| **Chain** | 프롬프트 + LLM을 연결하여 텍스트 3줄 요약 | `PromptTemplate \| ChatOpenAI \| StrOutputParser` |
+| **Retriever** | 사내 정책 문서에서 관련 문서 검색 | LLM 기반 문서 매칭 |
+| **Tool** | 요약 + 검색 결과를 메일로 자동 발송 | `send_email_tool()` (Mock) |
+| **Memory** | 대화 이력을 저장하여 맥락 유지 | `ChatMessageHistory` |
+
+### 실행
+
+```bash
+source ~/ai-venv/bin/activate
+cd ~/ai-course
+python assistant_chain.py
+```
+
+### 실행 결과 예시
+
+```
+[1단계: 텍스트 요약 Chain 실행 중...]
+요약 완료:
+- 2026년 3분기 AI 어시스턴트 도입 프로젝트의 진행 경과를 보고합니다.
+- LangChain 기반 업무 자동화 파이프라인 설계 완료, 서버 환경 구축 및 OpenAI API 연동 테스트 성공.
+- 다음 단계로 사내 회의록 요약 시스템과 Google Drive 및 메일 API 연동 실증 프로젝트 착수 예정.
+
+[2단계: 관련 사내 문서 Retriever 검색 중...]
+검색된 참조 지식: 사내 AI 도입 정책 가이드라인: 외부 API 사용 시 BYOK 원칙 준수 및 개인정보 마스킹 필수.
+
+[3단계: 최종 보고 메일 본문 구성 및 Tool 전송 중...]
+==================================================
+[메일 자동 발송 완료 알림]
+  수신자: manager@company.com
+  제목: [자동 보고] 프로젝트 현황 요약 및 사내 규정 참조 건
+  ...
+==================================================
+```
+
+### 사용 모델
+
+- LLM: `gpt-5-nano` (고정)
 
 ## 자주 발생하는 오류와 해결 방법
 
