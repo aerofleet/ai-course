@@ -15,6 +15,7 @@ ai-course/
 ├── requirements.txt      # 필요한 패키지 목록
 ├── check_langchain.py    # LangChain 정상 작동 확인 스크립트
 ├── assistant_chain.py    # 업무 어시스턴트 파이프라인 (Chain, Retriever, Tool, Memory)
+├── SUBMISSION.md         # 과제 제출용 구조 분석 요약
 └── README.md
 ```
 
