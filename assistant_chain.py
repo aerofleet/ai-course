@@ -10,7 +10,8 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
-from langchain.memory import ConversationBufferMemory
+from langchain_community.chat_message_histories import ChatMessageHistory
+from langchain_core.runnables.history import RunnableWithMessageHistory
 
 # 1. 환경 변수 로드 (.env의 OPENAI_API_KEY 사용)
 load_dotenv()
@@ -46,7 +47,7 @@ vector_store = FAISS.from_documents(documents, embeddings)
 retriever = vector_store.as_retriever(search_kwargs={"k": 1})
 
 # 대화 맥락 기억용 Memory
-memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+memory = ChatMessageHistory()
 
 # ==============================================================================
 # [요소 3: Tool] 외부 발송 도구 (이메일 발송 Mock 함수)
@@ -92,7 +93,8 @@ AI 어시스턴트 드림
     status = send_email_tool(recipient_email, mail_subject, mail_body)
 
     # 대화 이력 메모리에 저장
-    memory.save_context({"input": user_input_text}, {"output": mail_body})
+    memory.add_user_message(user_input_text)
+    memory.add_ai_message(mail_body)
 
     return status
 
