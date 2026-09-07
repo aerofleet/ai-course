@@ -5,18 +5,15 @@
 import os
 from dotenv import load_dotenv
 
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_community.vectorstores import FAISS
-from langchain_core.documents import Document
 from langchain_community.chat_message_histories import ChatMessageHistory
-from langchain_core.runnables.history import RunnableWithMessageHistory
 
 # 1. 환경 변수 로드 (.env의 OPENAI_API_KEY 사용)
 load_dotenv()
 
-# 2. LLM 엔진 초기화
+# 2. LLM 엔진 초기화 (gpt-5-nano 고정)
 llm = ChatOpenAI(model="gpt-5-nano", temperature=0.2)
 
 # ==============================================================================
@@ -33,24 +30,42 @@ summary_prompt = PromptTemplate.from_template(
 summary_chain = summary_prompt | llm | StrOutputParser()
 
 # ==============================================================================
-# [요소 2: Retriever & Memory] 문서 검색(Retriever) 및 기억(Memory)
+# [요소 2: Retriever] LLM 기반 문서 검색
 # ==============================================================================
-# 사내 정책/지식 문서 임베딩 및 벡터 저장소 구축
-documents = [
-    Document(page_content="사내 AI 도입 정책 가이드라인: 외부 API 사용 시 BYOK 원칙 준수 및 개인정보 마스킹 필수.", metadata={"source": "보안규정"}),
-    Document(page_content="주간 보고 작성 지침: 매주 금요일 오후 4시까지 Notion 및 슬랙 채널을 통해 공유.", metadata={"source": "업무매뉴얼"}),
-    Document(page_content="담당자 연락망: AI 자동화 프로젝트 PM 김철수(cs.kim@example.com), 보안담당 이영희(yh.lee@example.com).", metadata={"source": "연락망"})
+# 사내 정책/지식 문서
+KNOWLEDGE_BASE = [
+    {"source": "보안규정", "content": "사내 AI 도입 정책 가이드라인: 외부 API 사용 시 BYOK 원칙 준수 및 개인정보 마스킹 필수."},
+    {"source": "업무매뉴얼", "content": "주간 보고 작성 지침: 매주 금요일 오후 4시까지 Notion 및 슬랙 채널을 통해 공유."},
+    {"source": "연락망", "content": "담당자 연락망: AI 자동화 프로젝트 PM 김철수(cs.kim@example.com), 보안담당 이영희(yh.lee@example.com)."}
 ]
 
-embeddings = OpenAIEmbeddings()
-vector_store = FAISS.from_documents(documents, embeddings)
-retriever = vector_store.as_retriever(search_kwargs={"k": 1})
+retriever_prompt = PromptTemplate.from_template(
+    """아래 문서 목록에서 질문과 가장 관련 있는 문서 1개의 번호만 답하세요. 숫자만 출력하세요.
 
-# 대화 맥락 기억용 Memory
+[문서 목록]:
+{documents}
+
+[질문]: {query}
+
+[답변 (번호만)]:"""
+)
+retriever_chain = retriever_prompt | llm | StrOutputParser()
+
+def retrieve_document(query: str) -> str:
+    """LLM을 활용한 문서 검색 Retriever"""
+    doc_list = "\n".join([f"{i+1}. [{d['source']}] {d['content']}" for i, d in enumerate(KNOWLEDGE_BASE)])
+    result = retriever_chain.invoke({"documents": doc_list, "query": query})
+    try:
+        idx = int(result.strip()) - 1
+        return KNOWLEDGE_BASE[idx]["content"]
+    except (ValueError, IndexError):
+        return KNOWLEDGE_BASE[0]["content"]
+
+# [요소 3: Memory] 대화 맥락 기억
 memory = ChatMessageHistory()
 
 # ==============================================================================
-# [요소 3: Tool] 외부 발송 도구 (이메일 발송 Mock 함수)
+# [요소 4: Tool] 외부 발송 도구 (이메일 발송 Mock 함수)
 # ==============================================================================
 def send_email_tool(recipient: str, subject: str, body: str) -> str:
     """모의 이메일 발송 Tool (실제 환경에서는 SMTP/Gmail API 연동)"""
@@ -71,8 +86,7 @@ def run_assistant_pipeline(user_input_text: str, query_for_search: str, recipien
     print(f"요약 완료:\n{summary_result}")
 
     print("\n[2단계: 관련 사내 문서 Retriever 검색 중...]")
-    retrieved_docs = retriever.invoke(query_for_search)
-    referenced_doc = retrieved_docs[0].page_content if retrieved_docs else "참조 문서 없음"
+    referenced_doc = retrieve_document(query_for_search)
     print(f"검색된 참조 지식: {referenced_doc}")
 
     print("\n[3단계: 최종 보고 메일 본문 구성 및 Tool 전송 중...]")
