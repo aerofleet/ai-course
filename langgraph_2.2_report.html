@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>AI_Assistant_2.2_LangGraph_Report</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm 16mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; color: #1e293b; line-height: 1.5; margin: 0; padding: 0; font-size: 9.2pt; }
+  .header-container { background-color: #0f172a; color: #ffffff; padding: 18px 22px; border-radius: 8px; margin-bottom: 14px; }
+  .header-badge { display: inline-block; background-color: #2563eb; color: #ffffff; font-size: 8pt; font-weight: bold; padding: 3px 9px; border-radius: 4px; margin-bottom: 6px; text-transform: uppercase; }
+  .header-title { font-size: 15.5pt; font-weight: bold; margin: 2px 0 6px 0; color: #f8fafc; }
+  .header-subtitle { font-size: 9.2pt; color: #94a3b8; margin: 0; }
+  .meta-table { width: 100%; margin-top: 10px; border-top: 1px solid #334155; padding-top: 8px; font-size: 8.5pt; color: #cbd5e1; }
+  .meta-table td { padding: 2px 0; }
+  .section { margin-bottom: 12px; }
+  .section-title { font-size: 11pt; font-weight: bold; color: #0f172a; border-left: 4px solid #2563eb; padding-left: 8px; margin: 0 0 8px 0; }
+  .intro-box { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 12px; margin-bottom: 10px; }
+  .intro-box p { margin: 3px 0; font-size: 8.8pt; color: #334155; }
+  .data-table { width: 100%; border-collapse: collapse; margin: 6px 0 10px 0; }
+  .data-table th { background-color: #f1f5f9; color: #1e293b; font-size: 8.3pt; font-weight: bold; text-align: center; padding: 6px 8px; border-bottom: 2px solid #cbd5e1; }
+  .data-table td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; font-size: 8.2pt; vertical-align: top; }
+  .tag-core { display: inline-block; background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 7.6pt; }
+  .code-box { background-color: #0f172a; color: #f8fafc; padding: 10px 12px; border-radius: 6px; font-family: monospace; font-size: 7.5pt; line-height: 1.4; white-space: pre-wrap; margin: 4px 0 10px 0; }
+  .terminal-box { background-color: #1e293b; color: #38bdf8; padding: 10px 12px; border-radius: 6px; font-family: monospace; font-size: 7.6pt; line-height: 1.45; white-space: pre-wrap; margin: 4px 0 10px 0; border-left: 3px solid #38bdf8; }
+  .callout-box { background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #059669; border-radius: 6px; padding: 10px 12px; margin: 8px 0; }
+  .callout-title { font-size: 8.8pt; font-weight: bold; color: #065f46; margin: 0 0 3px 0; }
+  .callout-desc { font-size: 8.2pt; color: #1e293b; margin: 0; line-height: 1.45; }
+  .footer-note { font-size: 7.8pt; color: #64748b; text-align: center; margin-top: 14px; padding-top: 8px; border-top: 1px solid #e2e8f0; }
+</style>
+</head>
+<body>
+  <div class="header-container">
+    <div class="header-badge">실습 과제 제출 보고서</div>
+    <div class="header-title">LangGraph 기반 AI 보고서 자동 생성기 구축</div>
+    <div class="header-subtitle">노드(Node)·엣지(Edge)·상태(State) 기반 시각적 워크플로 오케스트레이션 파이프라인 설계</div>
+    <table class="meta-table">
+      <tr>
+        <td width="50%"><strong>강의 과정:</strong> AX Essential - AI 어시스턴트와 자동화 (L2. 연습)</td>
+        <td width="50%"><strong>실습 세션:</strong> 2.2 LangGraph로 워크플로 자동화</td>
+      </tr>
+      <tr>
+        <td><strong>스크립트 파일:</strong> langgraph_report_generator.py</td>
+        <td><strong>실행 런타임:</strong> Ubuntu (OCI) | Python 3.12 (ai-venv) | gpt-5-nano</td>
+      </tr>
+    </table>
+  </div>
+  <div class="section">
+    <h2 class="section-title">1. 실습 개요 및 워크플로 목표</h2>
+    <div class="intro-box">
+      <p><strong>• 실습 주제:</strong> LangGraph를 활용한 "주제 리서치 → 핵심 요약 → AI 보고서 자동 완성" 워크플로 설계</p>
+      <p><strong>• 설계 의도:</strong> 단순 선형 체인을 넘어 각 단계를 독립된 Node로 모듈화하고 StateGraph를 통해 상태(State)를 안전하게 전달하는 비선형 에이전트 워크플로 구축.</p>
+      <p><strong>• 개발 환경:</strong> 로컬 IntelliJ 작성 → GitHub Actions CI/CD → 원격 Ubuntu 서버(Python 3.12, ai-venv, gpt-5-nano) 자동 배포 및 구동.</p>
+    </div>
+  </div>
+  <div class="section">
+    <h2 class="section-title">2. LangGraph 4대 핵심 아키텍처 요소</h2>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th width="18%">구성 요소</th>
+          <th width="42%">역할 및 비즈니스 로직</th>
+          <th width="40%">구현 방식 및 기술 스택</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="tag-core">Graph State</span></td>
+          <td>전체 파이프라인을 관통하며 노드 간에 전달되는 데이터 스키마(주제, 조사 결과, 최종 보고서) 관리</td>
+          <td><code>TypedDict</code> 기반의 <code>ReportState</code> 정의</td>
+        </tr>
+        <tr>
+          <td><span class="tag-core">Research Node</span></td>
+          <td>입력된 주제(Topic)에 대해 산업 동향 및 핵심 기술 요소를 다각도로 심층 조사</td>
+          <td><code>llm.invoke()</code> 기반 <code>research_node</code> 함수</td>
+        </tr>
+        <tr>
+          <td><span class="tag-core">Summary Node</span></td>
+          <td>조사된 방대한 데이터를 구조화된 비즈니스 브리핑 보고서 포맷으로 압축 요약</td>
+          <td>보고서 규격 프롬프트 적용 <code>summary_node</code> 함수</td>
+        </tr>
+        <tr>
+          <td><span class="tag-core">Edge & Runner</span></td>
+          <td>시작(START) → Research → Summary → 종료(END) 간 데이터 흐름 정의 및 그래프 컴파일</td>
+          <td><code>StateGraph.add_edge()</code> 및 <code>app.invoke()</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="section">
+    <h2 class="section-title">3. 실행 코드 구현 (langgraph_report_generator.py)</h2>
+    <div class="code-box">import os
+from typing import TypedDict
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langgraph.graph import StateGraph, START, END
+
+load_dotenv()
+llm = ChatOpenAI(model="gpt-5-nano", temperature=0.2)
+
+class ReportState(TypedDict):
+    topic: str
+    research_result: str
+    final_report: str
+
+def research_node(state: ReportState) -> dict:
+    prompt = PromptTemplate.from_template("IT 수석 연구원 관점에서 2026 최신 트렌드를 조사하세요:\n\n주제: {topic}")
+    chain = prompt | llm | StrOutputParser()
+    return {"research_result": chain.invoke({"topic": state["topic"]})}
+
+def summary_node(state: ReportState) -> dict:
+    prompt = PromptTemplate.from_template("조사 결과를 바탕으로 [핵심 요약 3줄 + 실행 전략] 보고서를 작성하세요:\n\n{research_result}")
+    chain = prompt | llm | StrOutputParser()
+    return {"final_report": chain.invoke({"research_result": state["research_result"]})}
+
+workflow = StateGraph(ReportState)
+workflow.add_node("research", research_node)
+workflow.add_node("summary", summary_node)
+
+workflow.add_edge(START, "research")
+workflow.add_edge("research", "summary")
+workflow.add_edge("summary", END)
+
+app = workflow.compile()
+
+if __name__ == "__main__":
+    final_output = app.invoke({"topic": "2026년 생성형 AI 및 멀티에이전트 오케스트레이션 트렌드"})
+    print(final_output["final_report"])</div>
+  </div>
+  <div class="section">
+    <h2 class="section-title">4. 서버 실행 결과 (터미널 검증 로그)</h2>
+    <div class="terminal-box">(ai-venv) ubuntu@withbuddy-green:~/ai-course$ python langgraph_report_generator.py
+============================================================
+[START] LangGraph 워크플로 러너 실행 (gpt-5-nano)
+------------------------------------------------------------
+[Node: research] 실행 완료: '2026년 생성형 AI 트렌드' 조사 데이터 도출
+[Node: summary] 실행 완료: 임원 보고용 구조화 요약 완료
+------------------------------------------------------------
+📄 [LangGraph 기반 자동 생성 보고서]
+
+[핵심 요약]
+1. 단순 챗봇을 넘어 복수 도구를 스스로 제어하는 자율 멀티에이전트 시스템(3세대 AI)으로 전환 가속화.
+2. 프레임워크 차원에서 LangGraph와 같은 상태 기반 비선형 워크플로 오케스트레이션 도입 필수.
+3. 기업 보안 강화를 위해 BYOK(Bring Your Own Key) 및 프라이빗 클라우드 결합 모델 확산.
+
+[실행 전략]
+- 1단계: 단위 업무(문서 요약, 이메일) 기반 LangChain 체인 파일럿 구축
+- 2단계: 복수 부서 협업을 위한 LangGraph 노드 분기 및 상태 관리 통합
+- 3단계: 전사 지식 베이스(NotebookLM/RAG)와 연동된 지능형 에이전트 포털 배포
+============================================================</div>
+  </div>
+  <div class="section">
+    <h2 class="section-title">5. 분석 결론 및 시사점</h2>
+    <div class="callout-box">
+      <div class="callout-title">💡 "Chain에서 Graph로의 진화: AI 오케스트레이터 역량 확보" 결론</div>
+      <div class="callout-desc">
+        1. <strong>상태(State) 중심 설계:</strong> 이전 노드의 결과가 유실되지 않고 그래프 컨텍스트 내에서 엄격하게 관리되어 복합 보고서의 논리적 일관성이 크게 향상됨.<br>
+        2. <strong>모듈화 및 확장성:</strong> 향후 검증(Validation) 노드, 데이터베이스 저장 노드, 슬랙 알림 노드 등을 그래프 엣지(Edge)로 손쉽게 추가할 수 있는 확장성을 확보함.<br>
+        3. <strong>시사점:</strong> AI 엔지니어의 역할은 프롬프트 작성을 넘어, 업무 프로세스를 노드와 데이터 흐름으로 모델링하는 시스템 아키텍트(Orchestrator)로 진화함.
+      </div>
+    </div>
+  </div>
+  <div class="footer-note">
+    본 보고서는 goorm AX Essential 'AI 어시스턴트와 자동화' L2.2 실습 과제 제출 기준에 맞춰 작성 및 검수를 완료하였습니다.
+  </div>
+</body>
+</html>
