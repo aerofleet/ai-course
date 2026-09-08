@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LangGraph 작동 방식 시각화</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+        .description {
+            text-align: center;
+            color: #666;
+            font-size: 15px;
+            margin-bottom: 40px;
+            line-height: 1.6;
+        }
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            background: white;
+            border-radius: 12px;
+            padding: 32px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+    </style>
+</head>
+<body>
+    <h1>LangGraph 작동 방식 시각화</h1>
+    <p class="description">
+        노드는 작업을 의미하고, 엣지는 다음 이동 경로를 의미합니다.<br>
+        State는 노드를 지나면서 계속 업데이트됩니다.
+    </p>
+    <div class="mermaid">
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	check_input(check_input)
+	decide_level(decide_level)
+	beginner_guide(beginner_guide)
+	advanced_guide(advanced_guide)
+	finish(finish)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> check_input;
+	advanced_guide --> finish;
+	beginner_guide --> finish;
+	check_input --> decide_level;
+	decide_level -.-> advanced_guide;
+	decide_level -.-> beginner_guide;
+	finish --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
+
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+</body>
+</html>
