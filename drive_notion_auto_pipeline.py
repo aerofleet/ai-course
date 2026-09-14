@@ -11,7 +11,7 @@ load_dotenv()
 NOTION_TOKEN = os.getenv("NOTION_TOKEN")
 NOTION_DATABASE_ID = os.getenv("NOTION_DATABASE_ID")
 
-llm = ChatOpenAI(model="gpt-4.1-nano", temperature=0.2)
+llm = ChatOpenAI(model="gpt-5-nano", temperature=0.2)
 
 summary_prompt = PromptTemplate.from_template(
     """당신은 사내 지식 관리 수석 비서입니다. 아래 문서를 임원 및 팀 공유용으로 요약하세요.
@@ -100,7 +100,7 @@ def run_pipeline(file_id: str = "sample-file-id-001") -> dict:
         "step": 2,
         "label": "GPT 요약 Chain 실행",
         "status": "success",
-        "detail": "gpt-4.1-nano 모델 사용",
+        "detail": "gpt-5-nano 모델 사용",
         "content": summary,
     })
 

@@ -71,7 +71,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <div class="arch-step">
       <div class="icon">🧠</div>
       <div class="label">GPT Chain</div>
-      <div class="tech">gpt-4.1-nano</div>
+      <div class="tech">gpt-5-nano</div>
     </div>
     <div class="arch-arrow">→</div>
     <div class="arch-step">
