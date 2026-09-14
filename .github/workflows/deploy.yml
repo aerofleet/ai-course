@@ -15,17 +15,15 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          command_timeout: 60s
           script: |
             cd ~/ai-course
             git pull origin main
             source ~/ai-venv/bin/activate
             pip install -r requirements.txt --quiet
 
-            # webapp 재시작
-            pkill -f "python webapp.py" || true
+            # webapp 재시작 (screen 세션)
+            screen -S webapp -X quit 2>/dev/null || true
             sleep 1
-            nohup python webapp.py > ~/ai-course/webapp.log 2>&1 &
-            disown
+            screen -dmS webapp bash -c 'source ~/ai-venv/bin/activate && cd ~/ai-course && python webapp.py'
             sleep 2
-            curl -sf http://localhost:8080/health || echo "health check pending"
+            curl -sf http://localhost:8080/health && echo "webapp OK" || echo "webapp FAIL"
