@@ -103,7 +103,7 @@ async function runPipeline() {
   results.innerHTML = '';
 
   try {
-    const res = await fetch('/api/run', { method: 'POST' });
+    const res = await fetch('api/run', { method: 'POST' });
     const data = await res.json();
 
     if (data.error) {
