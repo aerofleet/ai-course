@@ -20,3 +20,10 @@ jobs:
             git pull origin main
             source ~/ai-venv/bin/activate
             pip install -r requirements.txt --quiet
+
+            # webapp 재시작 (기존 프로세스 종료 후 백그라운드 실행)
+            pkill -f "python webapp.py" || true
+            sleep 1
+            nohup python webapp.py > ~/ai-course/webapp.log 2>&1 &
+            sleep 2
+            curl -sf http://localhost:8080/health && echo "webapp started OK" || echo "webapp start FAILED"
