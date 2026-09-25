@@ -3,6 +3,10 @@
 AI 교육과정 실습 프로젝트입니다.
 LangChain + OpenAI를 활용하여 AI 기능을 학습합니다.
 
+## 개인 비서 웹앱
+
+`personal-assistant/`에 React + Vite + TypeScript 개인 비서 MVP가 있습니다. Google Calendar/Gmail을 브라우저에서 직접 연결하며 설정과 사용법은 [`personal-assistant/README.md`](personal-assistant/README.md)를 참고하세요. CI는 웹앱 빌드를 확인한 뒤 서버에서 빌드하고 `/assistant/` 경로로 제공합니다. GitHub Actions 저장소 변수 `VITE_GOOGLE_CLIENT_ID`에는 웹 애플리케이션 유형 Google OAuth Client ID가 필요합니다.
+
 ## 프로젝트 구조
 
 ```
