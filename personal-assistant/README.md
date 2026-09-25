@@ -28,7 +28,7 @@ GitHub Actions 배포에서는 저장소 변수 `VITE_GOOGLE_CLIENT_ID`에 같�
 
 ```nginx
 location = /assistant/ {
-    alias /home/ubuntu/ai-course/personal-assistant/dist/index.html;
+    rewrite ^ /assistant/index.html last;
 }
 location ^~ /assistant/ {
     alias /home/ubuntu/ai-course/personal-assistant/dist/;
