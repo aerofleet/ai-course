@@ -3,6 +3,7 @@ name: Deploy to AI Server
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   build-assistant:
@@ -20,8 +21,10 @@ jobs:
       - name: Build assistant
         working-directory: personal-assistant
         env:
-          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
-        run: npm run build
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID || secrets.VITE_GOOGLE_CLIENT_ID }}
+        run: |
+          test -n "$VITE_GOOGLE_CLIENT_ID"
+          npm run build
 
   deploy:
     needs: build-assistant
@@ -31,7 +34,7 @@ jobs:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         env:
-          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID || secrets.VITE_GOOGLE_CLIENT_ID }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
@@ -39,6 +42,7 @@ jobs:
           envs: VITE_GOOGLE_CLIENT_ID
           script: |
             set -e
+            test -n "$VITE_GOOGLE_CLIENT_ID"
             cd ~/ai-course
             git pull --ff-only origin main
             npm ci --prefix personal-assistant
