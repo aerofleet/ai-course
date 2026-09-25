@@ -24,6 +24,19 @@ npm run dev
 
 GitHub Actions 배포에서는 저장소 변수 `VITE_GOOGLE_CLIENT_ID`에 같은 **웹** Client ID를 등록합니다. 배포 서버에서는 워크플로가 이 변수로 `/assistant/` 빌드를 생성합니다. 데스크톱용 OAuth Client ID는 브라우저 로그인에 사용할 수 없습니다.
 
+배포 서버의 Nginx에는 기존 HTTPS `server` 블록 안에 아래 경로를 한 번 설정해야 합니다. 설정 파일을 백업하고 `nginx -t` 통과 후 reload합니다. CI는 빌드 후 이 경로가 HTTP 200을 반환하는지 검사합니다.
+
+```nginx
+location = /assistant/ {
+    alias /home/ubuntu/ai-course/personal-assistant/dist/index.html;
+}
+location ^~ /assistant/ {
+    alias /home/ubuntu/ai-course/personal-assistant/dist/;
+    index index.html;
+    try_files $uri $uri/ /assistant/index.html;
+}
+```
+
 Calendar 조회는 `calendar.readonly`, 일정 생성 확인 시 `calendar.events`, Gmail 조회는 `gmail.readonly` 범위를 각각 요청합니다. Gmail 검색 쿼리를 사용하므로 `gmail.metadata`만으로는 구현할 수 없습니다. Gmail 읽기 권한은 민감한 범위이므로 외부 사용자에게 배포할 때 Google의 검증 요구사항을 확인해야 합니다.
 
 ## 사용 흐름
