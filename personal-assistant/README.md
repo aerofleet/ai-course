@@ -24,6 +24,8 @@ npm run dev
 
 GitHub Actions 배포에서는 저장소 변수(또는 Secret) `VITE_GOOGLE_CLIENT_ID`에 같은 **웹** Client ID를 등록합니다. 배포 서버에서는 워크플로가 이 값으로 `/assistant/` 빌드를 생성합니다. 값을 바꾼 뒤에는 Actions의 `Deploy to AI Server` 워크플로를 수동 실행할 수 있습니다. 데스크톱용 OAuth Client ID는 브라우저 로그인에 사용할 수 없습니다.
 
+Google 로그인에서 `401 invalid_client`가 표시되면, 등록값이 JSON 경로·`VITE_GOOGLE_CLIENT_ID=` 접두사·따옴표 없이 Client ID 자체인지 확인합니다. 웹 애플리케이션 유형 Client ID의 승인된 JavaScript 원본에 실제 HTTPS 원본을 등록하고, 값 변경 후에는 반드시 워크플로를 다시 실행해야 합니다. 이전 빌드에는 새 환경변수가 자동 반영되지 않습니다.
+
 배포 서버의 Nginx에는 기존 HTTPS `server` 블록 안에 아래 경로를 한 번 설정해야 합니다. 설정 파일을 백업하고 `nginx -t` 통과 후 reload합니다. CI는 빌드 후 이 경로가 HTTP 200을 반환하는지 검사합니다.
 
 ```nginx
