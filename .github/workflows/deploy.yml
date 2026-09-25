@@ -24,6 +24,10 @@ jobs:
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID || secrets.VITE_GOOGLE_CLIENT_ID }}
         run: |
           test -n "$VITE_GOOGLE_CLIENT_ID"
+          case "$VITE_GOOGLE_CLIENT_ID" in
+            *.apps.googleusercontent.com) ;;
+            *) echo 'VITE_GOOGLE_CLIENT_ID must be a Google OAuth Client ID ending in .apps.googleusercontent.com' >&2; exit 1 ;;
+          esac
           npm run build
 
   deploy:
@@ -43,6 +47,10 @@ jobs:
           script: |
             set -e
             test -n "$VITE_GOOGLE_CLIENT_ID"
+            case "$VITE_GOOGLE_CLIENT_ID" in
+              *.apps.googleusercontent.com) ;;
+              *) echo 'VITE_GOOGLE_CLIENT_ID has an invalid format' >&2; exit 1 ;;
+            esac
             cd ~/ai-course
             git pull --ff-only origin main
             npm ci --prefix personal-assistant

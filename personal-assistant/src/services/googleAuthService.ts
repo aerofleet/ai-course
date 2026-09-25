@@ -22,7 +22,7 @@ export function getToken(scope: string): string {
   return token.value
 }
 export async function requestScope(scope: string): Promise<void> {
-  if (!clientId || clientId.includes('your-web-oauth')) throw new Error('Google Client ID가 설정되지 않았어요. README의 설정 방법을 확인해 주세요.')
+  if (!clientId || !clientId.endsWith('.apps.googleusercontent.com')) throw new Error('Google 웹 OAuth Client ID가 올바르게 설정되지 않았어요. README의 설정 방법을 확인해 주세요.')
   const google = (window as GoogleWindow).google
   if (!google?.accounts.oauth2) throw new Error('Google 로그인 도구를 불러오지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요.')
   await new Promise<void>((resolve, reject) => {
