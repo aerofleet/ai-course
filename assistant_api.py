@@ -244,14 +244,17 @@ def interpret_command(question, timezone='Asia/Seoul', now=None, context=None):
     safe_context = {'calendarCommand': previous, 'importantCategories': preferences,
                     'lastTopic': context.get('lastTopic'), 'teamMembers': checked_emails(context.get('teamMembers', [])),
                     'pendingRequest': str(context.get('pendingRequest', ''))[:2000]}
-    result = openai_response(INTERPRET_PROMPT, {'question': question, 'now': now.isoformat(), 'timezone': timezone, 'context': safe_context}, COMMAND_SCHEMA)
+    model_question = question
+    if safe_context['pendingRequest'] and not re.search(r'(?:오늘|내일|앞으로|이번|다음).*(?:조회|확인|알려|요약)|최근.*메일|생일|생신|기념일', question):
+        model_question = safe_context['pendingRequest'] + '\n추가 정보: ' + question
+    result = openai_response(INTERPRET_PROMPT, {'question': model_question, 'currentQuestion': question, 'now': now.isoformat(), 'timezone': timezone, 'context': safe_context}, COMMAND_SCHEMA)
     command = {'action': result['action'], 'query': result.get('query') or '', 'importantOnly': bool(result.get('importantOnly')),
                'clarification': result.get('clarification'), 'categoryFilter': checked_categories(result.get('categoryFilter', [])),
                'importantCategories': preferences, 'timezone': timezone, 'reusePrevious': False,
                'listOnly': bool(result.get('listOnly')), 'inspectTitle': result.get('inspectTitle')}
     pending_context = safe_context['pendingRequest'] if result['action'] in ('calendar_create', 'unknown') else ''
     combined_request = pending_context + ' ' + question
-    share = bool(result.get('shareWithTeam') or re.search(r'공유|초대', combined_request))
+    share = bool(re.search(r'공유|초대|\bshare\b|\binvite\b', combined_request, re.I))
     if share or (pending_context and result['action'] == 'calendar_create'):
         emails = re.findall(r'[A-Za-z0-9.!#$%&\x27*+/=?^_`{|}~-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}', combined_request)
         attendees = checked_emails(emails or safe_context['teamMembers']) if share else []
@@ -270,7 +273,8 @@ def interpret_command(question, timezone='Asia/Seoul', now=None, context=None):
     unsupported_write = re.search(r'(?:삭제|지워|지우|발송|전송|보내)\s*(?:해|줘|주세요|버려|하)|삭제해|지워줘|보내줘|발송해', question)
     if unsupported_write:
         return {'action': 'unknown', 'clarification': '현재 일정 삭제·수정과 메일 발송은 지원하지 않아요. 일정 조회·생성, 메일 검색·요약과 답장 초안은 지원합니다.'}
-    if result.get('unsupported'):
+    supported_omission = previous and re.search(r'누락|빠졌|빠져|빠진|안\s*보', question) and not re.search(r'메일|이메일|답장|회신', question)
+    if result.get('unsupported') and not supported_omission:
         return {'action': 'unknown', 'clarification': result.get('clarification') or '현재 일정 삭제·수정과 메일 발송은 지원하지 않아요.'}
     command['convertLunar'] = bool(result.get('convertLunar')) and bool(re.search(r'양력|변환|convert|solar', question, re.I))
     lunar_input = re.search(r'음력\s*(?:은|이|:)?\s*(?:평달|윤달)?\s*(\d{1,2})\s*(?:월|/)\s*(\d{1,2})', question)

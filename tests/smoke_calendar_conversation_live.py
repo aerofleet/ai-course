@@ -104,4 +104,5 @@ assert command['action'] == 'unknown' and command.get('pendingRequest'), command
 command = interpret_command('member1@example.com과 member2@example.com에게 초대해줘', now=now, context={'pendingRequest': command['pendingRequest']})
 assert command['action'] == 'calendar_create', command
 assert command['create']['attendees'] == ['member1@example.com', 'member2@example.com'], command
+assert command['create']['start'] == '2026-09-27T10:00:00+09:00', command
 print({'team_share_clarification_and_resume': True, 'conversation_cases_passed': 18})

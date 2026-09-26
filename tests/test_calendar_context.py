@@ -46,6 +46,12 @@ class CalendarContextTests(unittest.TestCase):
         self.assertNotIn('KT통신요금', text)
         self.assertNotIn('캘린더: 가족', text)
 
+    def test_supported_omission_ignores_wrong_share_and_unsupported_flags(self):
+        command = self.interpret('장인생신 음력 10/10 10월 10일 이게 앞에 뽑아준 중요 후보에서 누락이 되었어', self.model(action='unknown', shareWithTeam=True, unsupported=True, clarification='명령 해석이 필요합니다.'))
+        self.assertEqual(command['action'], 'calendar_read')
+        self.assertEqual(command['range'], self.previous['range'])
+        self.assertEqual(command['inspectTitle'], '장인생신')
+
     def test_generic_list_followup_keeps_previous_filter(self):
         self.previous['categoryFilter'] = ['birthday', 'anniversary']
         command = self.interpret('목록만 추려줘')

@@ -190,7 +190,7 @@ python assistant_chain.py
 - 결과는 이벤트 ID와 Google 응답에 근거한다. 초대 알림 요청 성공은 상대방의 수신·열람·참석 수락을 보장하지 않는다. 팀 목록과 미완료 요청은 화면 메모리에만 유지한다. Graph 체크포인트로 토큰을 저장하지 않는다.
 - OKR: 자연어 회의 생성과 팀 초대를 하나의 승인으로 완료한다. KPI/합격 기준: 승인 전 Google 쓰기 0건, 동일 작업 재시도 중복 생성 0건, 수신자 불일치 0건. 평가셋은 정상 생성·초대, 읽기 토큰 거부, 승인 누락, 오류·시간 초과, 재시도·동시 충돌, 이메일 오류와 실제 OpenAI 시간·수신자 추가 답변이다.
 - Before: 비서 실행 LangGraph 연결과 팀 초대 미구현. After: Graph 경로 및 Calendar 초대 구현. 검증 명령: `python -m unittest discover -s tests`, `npm test --prefix personal-assistant`, `npm run build --prefix personal-assistant`, `PYTHONPATH=. python tests/smoke_calendar_conversation_live.py`. 실제 사용자 Google 계정의 일정 생성·초대 수신 E2E는 미검증이며 별도 확인이 필요하다. 일정 충돌 확인 및 기존 이벤트의 참석자 수정은 이번 기능에 포함하지 않는다.
-- 결과: Python 68/68, 프론트엔드 15/15, 실제 OpenAI 합성 대화 18/18, TypeScript/Vite 빌드 성공. Google 생성·초대 및 실패 복구는 모의 API 응답으로 검증했다.
+- 결과: Python 69/69, 프론트엔드 15/15, 실제 OpenAI 합성 대화 18/18, TypeScript/Vite 빌드 성공. Google 생성·초대 및 실패 복구는 모의 API 응답으로 검증했다.
 
 ## Gmail 전용 OAuth 클라이언트 연결
 
