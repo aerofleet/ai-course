@@ -114,10 +114,13 @@ COMMAND_SCHEMA = object_schema({
     'inspectTitle': nullable_string, 'reusePrevious': {'type': 'boolean'}, 'listOnly': {'type': 'boolean'},
     'convertLunar': {'type': 'boolean'},
     'unsupported': {'type': 'boolean'},
+    'lunarDate': {'anyOf': [object_schema({'month': {'type': 'integer'}, 'day': {'type': 'integer'}, 'leap': {'type': ['boolean', 'null']}}), {'type': 'null'}]},
 })
 
 INTERPRET_PROMPT = """한국어 개인 비서의 명령을 구조화한다. 입력의 question은 명령이며 now/timezone은 기준 시각이다.
 후속 요청은 표현을 외우지 말고 context의 작업을 이어받아 처리한다. 이전 목록의 변환/재정리/표시 변경은 calendar_read, reusePrevious=true, range.kind=previous다.
+특정 일정의 양력 변환 요청은 inspectTitle에 그 일정 제목만 지정한다. 붙여 넣은 카드 날짜는 새 조회 기간이 아니다.
+음력 월·일이 추가 답변으로 주어지면 lunarDate에 기록하고 이전 inspectTitle과 조회 범위를 유지한다. lunarDate는 질문에서 명시된 음력 월·일만 사용한다. 없으면 null이다. 평달 leap=false, 윤달 true, 미지정 null. 등록된 양력 날짜를 음력 월·일로 가정하지 않는다.
 음력을 양력으로 바꾸어 표시하는 도구를 지원한다. convertLunar=true로 지정하고 날짜를 직접 계산하지 않는다. 이후 목록 요청에도 변환을 유지한다.
 일정 삭제/수정이나 메일 발송은 지원하지 않는다. 이런 요청은 unsupported=true, action=unknown과 구체적인 지원 한계 설명을 반환한다. 나머지는 unsupported=false.
 음력 변환은 캘린더 원본 변경이 아닌 조회 결과 표시 변환이다. 변환 요청에 이전 조회가 없으면 조회 대상/기간만 질문한다.
@@ -193,7 +196,8 @@ def validated_previous(context):
     return {'action': 'calendar_read', 'range': {key: value[key] for key in ('start', 'end', 'label')},
             'categoryFilter': checked_categories(previous.get('categoryFilter', [])),
             'importantOnly': bool(previous.get('importantOnly')), 'listOnly': bool(previous.get('listOnly')),
-            'inspectTitle': previous.get('inspectTitle'), 'convertLunar': bool(previous.get('convertLunar'))}
+            'inspectTitle': previous.get('inspectTitle'), 'convertLunar': bool(previous.get('convertLunar')),
+            'lunarDate': previous.get('lunarDate')}
 
 
 def explicit_period(question):
@@ -234,10 +238,24 @@ def interpret_command(question, timezone='Asia/Seoul', now=None, context=None):
     if result.get('unsupported'):
         return {'action': 'unknown', 'clarification': result.get('clarification') or '현재 일정 삭제·수정과 메일 발송은 지원하지 않아요.'}
     command['convertLunar'] = bool(result.get('convertLunar')) and bool(re.search(r'양력|변환|convert|solar', question, re.I))
+    lunar_input = re.search(r'음력\s*(?:은|이|:)?\s*(?:평달|윤달)?\s*(\d{1,2})\s*(?:월|/)\s*(\d{1,2})', question)
+    command['lunarDate'] = None
+    if lunar_input and previous and previous.get('inspectTitle') and previous.get('convertLunar'):
+        month, day = map(int, lunar_input.groups())
+        if not (1 <= month <= 12 and 1 <= day <= 30):
+            return {'action': 'unknown', 'clarification': '음력 월은 1~12월, 일은 1~30일로 알려 주세요.'}
+        command['lunarDate'] = {'month': month, 'day': day, 'leap': True if '윤달' in question else False if '평달' in question else None}
+        command.update(action='calendar_read', convertLunar=True, inspectTitle=previous['inspectTitle'])
+    card = re.search(r'\d{4}-\d{2}-\d{2}[^\n]*?·\s*([^\n]+?)(?:\s+이거|\s+이\s*일정|[”"]|$)', question)
+    target_conversion = command['convertLunar'] and (card or result.get('inspectTitle'))
+    if target_conversion:
+        command['inspectTitle'] = card.group(1).strip() if card else result['inspectTitle']
     period = explicit_period(question)
     omission = bool(re.search(r'누락|빠졌|빠져|빠진|안\s*보', question))
     mail_request = bool(re.search(r'메일|이메일|답장|회신', question))
     dated_question = bool(period or (not omission and re.search(r'\d{4}-\d{2}-\d{2}|\d{1,2}월|(?:이번|다음|지난)\s*(?:달|해|년)|올해|내년|작년|어제|모레|(?:한|두|세|네)\s*(?:달|개월|주)', question)))
+    if (card and target_conversion) or command['lunarDate']:
+        dated_question = False
     requested_categories = categories(question)
     preference_request = requested_categories and not period and not omission and re.search(r'(?:나한테|나에게|내게|내\s*기준).*중요|중요.*(?:기준|정해|설정)', question)
     model_preference = command['action'] == 'preference_update' and not dated_question and not re.search(r'확인|알려|보여|조회|추려|찾아', question)
@@ -272,15 +290,17 @@ def interpret_command(question, timezone='Asia/Seoul', now=None, context=None):
                 command['categoryFilter'] = []
         if re.search(r'전체|모든', question) and not requested_categories:
             command.update(categoryFilter=[], importantOnly=False)
-        if not omission and command.get('inspectTitle') and command['inspectTitle'] not in question:
+        if not omission and not command['lunarDate'] and command.get('inspectTitle') and command['inspectTitle'] not in question:
             command['inspectTitle'] = None
-        if followup and not requested_categories and not re.search(r'중요|전체|모든', question):
+        if followup and not target_conversion and not requested_categories and not re.search(r'중요|전체|모든', question):
             command['inspectTitle'] = previous.get('inspectTitle')
         command['listOnly'] = bool(re.search(r'(?:목록|리스트).*만|날짜.*제목.*만', question))
         inherit = previous and not dated_question and (followup or result.get('reusePrevious') or result['range']['kind'] == 'previous')
         if inherit:
             command['range'] = previous['range']
             command['convertLunar'] = command['convertLunar'] or previous.get('convertLunar', False)
+            if command.get('inspectTitle') == previous.get('inspectTitle') and not command['lunarDate']:
+                command['lunarDate'] = previous.get('lunarDate')
             command['reusePrevious'] = not omission
         else:
             if (requested_categories or command['convertLunar']) and not dated_question and not previous:

@@ -104,6 +104,10 @@ def calendar_answer(data):
     if command.get('convertLunar'):
         filtered, notes = convert_events(filtered, command, zone)
     selected = sorted(filtered, key=lambda event: (event_start_key(event, zone), event['title'], event.get('id', '')))
+    if command.get('inspectTitle') and command.get('convertLunar') and len(selected) == 1 and selected[0].get('conversionNote', '').startswith('변환 보류'):
+        event = selected[0]
+        return (f'“{event["title"]}”의 등록일은 {event_time(event, zone)}입니다. 이 날짜가 이미 변환된 양력 날짜인지, 음력 날짜를 그대로 등록한 것인지 제목만으로는 알 수 없어요.\n'
+                '실제 음력 생신 월·일을 알려 주세요. 예: “음력 10월 2일 평달이야”. 이 일정만 같은 조회 기간에서 변환해 드릴게요. 캘린더 원본은 변경하지 않습니다.'), selected
     scope = data.get('scope', {})
     partial = data.get('truncated') or scope.get('failedCalendars') or scope.get('skippedCalendars')
     lines = [f'조회 기간: {command["range"]["label"]} · 시간대: {zone.key}']

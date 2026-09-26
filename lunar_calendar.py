@@ -1,5 +1,6 @@
 """Offline lunar conversion of copies of source calendar records."""
 import re
+import unicodedata
 from datetime import date, datetime, timedelta
 from korean_lunar_calendar import KoreanLunarCalendar
 
@@ -10,18 +11,26 @@ def convert_events(events, command, zone):
     result, notes = [], []
     for source in events:
         event = dict(source)
-        text = source['title']
-        if '음력' not in text:
+        text = unicodedata.normalize('NFKC', source['title'])
+        text = re.sub(r'음\s+력', '음력', text)
+        override = command.get('lunarDate') if command.get('inspectTitle') else None
+        if '음력' not in text and not override:
             result.append(event)
             continue
-        match = re.search(r'음력\s*[(:：]?\s*(윤달|윤|평달|평)?\s*(\d{1,2})\s*(?:/|월|\.)\s*(\d{1,2})', text)
-        if not match:
+        match = re.search(r'음력[\s():：\[\]{}]*\s*(윤달|윤|평달|평)?\s*(\d{1,2})\s*(?:/|월|\.)\s*(\d{1,2})', text)
+        if not match and not override:
             event['conversionNote'] = '변환 보류: 음력 월·일과 평달/윤달을 알려 주세요. 등록일을 유지했습니다.'
             result.append(event)
             continue
-        word, month, day = match.groups()
-        explicit = bool(word) or bool(re.search(r'윤달|평달', text))
-        leap = bool((word and word.startswith('윤')) or '윤달' in text)
+        if override:
+            month, day = override['month'], override['day']
+            if not isinstance(month, int) or not isinstance(day, int) or not 1 <= month <= 12 or not 1 <= day <= 30 or override.get('leap') not in (True, False, None):
+                raise ValueError('invalid lunar date')
+            explicit, leap = override.get('leap') is not None, override.get('leap') is True
+        else:
+            word, month, day = match.groups()
+            explicit = bool(word) or bool(re.search(r'윤달|평달', text))
+            leap = bool((word and word.startswith('윤')) or '윤달' in text)
         candidates, ambiguous = [], False
         for year in range(first.year - 1, last.year + 1):
             dates = []

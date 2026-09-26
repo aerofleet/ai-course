@@ -10,6 +10,50 @@ class LunarTests(unittest.TestCase):
     model = context_tests.CalendarContextTests.model
     interpret = context_tests.CalendarContextTests.interpret
     data = context_tests.CalendarContextTests.data
+
+    def test_parenthesized_labels_and_dates_are_read(self):
+        for title in ['장모님 생신(음력 10/2)', '장모님 생신(음력) 10/2', '장모님 생신（음력 10월 2일）', '장모님 생신( 음 력 10/2 )']:
+            with self.subTest(title=title):
+                self.events = [{'id': 'mother', 'title': title, 'start': '2026-11-10', 'end': '2026-11-11'}]
+                text, selected = calendar_answer(self.data({**self.previous, 'convertLunar': True}))
+                self.assertEqual(selected[0]['start'], '2026-11-10')
+                self.assertNotIn('변환 보류', text)
+
+    def test_marker_only_parentheses_never_guess_date(self):
+        for title in ['장모님 생신(음력)', '장모님 생신（음력）', '장모님 생신( 음 력 )']:
+            with self.subTest(title=title):
+                self.events = [{'id': 'mother', 'title': title, 'start': '2026-11-10', 'end': '2026-11-11'}]
+                text, selected = calendar_answer(self.data({**self.previous, 'convertLunar': True}))
+                self.assertIn('변환 보류', text)
+                self.assertEqual(selected[0]['start'], '2026-11-10')
+
+    def test_pasted_card_targets_only_mother_and_asks_specific_question(self):
+        question = '- 2026-11-10 (화) 15:30–16:30 · 장모님 생신(음력) 이거 양력으로 변경해줘'
+        command = self.interpret(question, self.model(convertLunar=True, reusePrevious=True))
+        self.assertEqual(command['inspectTitle'], '장모님 생신(음력)')
+        self.assertEqual(command['range'], self.previous['range'])
+        text, selected = calendar_answer(self.data(command))
+        self.assertEqual([item['id'] for item in selected], ['mother'])
+        self.assertNotIn('장인', text)
+        self.assertNotIn('조건에 맞는', text)
+        self.assertIn('음력 생신 월·일', text)
+
+    def test_missing_date_reply_continues_specific_conversion(self):
+        self.previous.update(inspectTitle='장모님 생신(음력)', convertLunar=True)
+        command = self.interpret('음력 10월 2일 평달이야', self.model(action='unknown'))
+        self.assertEqual(command['action'], 'calendar_read')
+        self.assertEqual(command['range'], self.previous['range'])
+        self.assertEqual(command['lunarDate'], {'month': 10, 'day': 2, 'leap': False})
+        text, selected = calendar_answer(self.data(command))
+        self.assertEqual([item['id'] for item in selected], ['mother'])
+        self.assertEqual(selected[0]['start'], '2026-11-10')
+        self.assertNotIn('변환 보류', text)
+        self.assertIn('이미 양력', text)
+
+    def test_invalid_lunar_reply_rejected(self):
+        self.previous.update(inspectTitle='장모님 생신(음력)', convertLunar=True)
+        command = self.interpret('음력 13월 2일 평달이야')
+        self.assertEqual(command['action'], 'unknown')
     def test_korean_reference_dates(self):
         calendar = KoreanLunarCalendar()
         self.assertTrue(calendar.setLunarDate(2026, 1, 1, False))

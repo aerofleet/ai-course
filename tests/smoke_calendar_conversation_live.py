@@ -66,3 +66,19 @@ for question in ['음력은 양력 날짜로 변경해서 다시 추려줘', '�
 command = interpret_command('생일 목록을 모두 삭제해줘', now=now, context=context)
 assert command['action'] == 'unknown' and command.get('clarification'), command
 print({'unsupported_write_blocked': True, 'conversation_cases_passed': 11})
+question = '- 2026-11-10 (화) 15:30–16:30 · 장모님 생신(음력) 이거 양력으로 변경해줘'
+command = interpret_command(question, now=now, context=context)
+assert command['action'] == 'calendar_read' and command['reusePrevious'], command
+assert command['inspectTitle'] == '장모님 생신(음력)', command
+assert command['range'] == context['calendarCommand']['range'], command
+text, selected = calendar_answer({'command': command, 'events': events})
+assert [item['id'] for item in selected] == ['mother'], selected
+assert '음력 생신 월·일' in text and '장인' not in text, text
+context['calendarCommand'] = command
+command = interpret_command('음력 10월 2일 평달이야', now=now, context=context)
+assert command['action'] == 'calendar_read' and command['reusePrevious'], command
+assert command['lunarDate'] == {'month': 10, 'day': 2, 'leap': False}, command
+text, selected = calendar_answer({'command': command, 'events': events})
+assert [item['id'] for item in selected] == ['mother'], selected
+assert selected[0]['start'] == '2026-11-10' and '변환 보류' not in text, text
+print({'specific_lunar_target_and_parameter_reply': True, 'conversation_cases_passed': 13})
