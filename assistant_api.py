@@ -112,9 +112,15 @@ COMMAND_SCHEMA = object_schema({
     'categoryFilter': {'type': 'array', 'items': {'type': 'string', 'enum': list(CATEGORY_LABELS)}},
     'importantCategories': {'type': ['array', 'null'], 'items': {'type': 'string', 'enum': list(CATEGORY_LABELS)}},
     'inspectTitle': nullable_string, 'reusePrevious': {'type': 'boolean'}, 'listOnly': {'type': 'boolean'},
+    'convertLunar': {'type': 'boolean'},
+    'unsupported': {'type': 'boolean'},
 })
 
 INTERPRET_PROMPT = """한국어 개인 비서의 명령을 구조화한다. 입력의 question은 명령이며 now/timezone은 기준 시각이다.
+후속 요청은 표현을 외우지 말고 context의 작업을 이어받아 처리한다. 이전 목록의 변환/재정리/표시 변경은 calendar_read, reusePrevious=true, range.kind=previous다.
+음력을 양력으로 바꾸어 표시하는 도구를 지원한다. convertLunar=true로 지정하고 날짜를 직접 계산하지 않는다. 이후 목록 요청에도 변환을 유지한다.
+일정 삭제/수정이나 메일 발송은 지원하지 않는다. 이런 요청은 unsupported=true, action=unknown과 구체적인 지원 한계 설명을 반환한다. 나머지는 unsupported=false.
+음력 변환은 캘린더 원본 변경이 아닌 조회 결과 표시 변환이다. 변환 요청에 이전 조회가 없으면 조회 대상/기간만 질문한다.
 일정 조회와 생성, Gmail 검색/요약, 답장 초안과 중요도 기준 변경을 지원한다. context에는 이전 조회 범위와 사용자가 정한 기준이 있다.
 읽기 요청에는 확인을 요구하지 않는다. 서버가 now/timezone을 제공하므로 사용자에게 시간대 오프셋을 요구하지 않는다.
 후속 질문 '목록만 추려줘'는 직전 작업과 기간을 유지한다. 이전 캘린더 결과를 재가공할 때 reusePrevious=true, range.kind=previous.
@@ -187,7 +193,7 @@ def validated_previous(context):
     return {'action': 'calendar_read', 'range': {key: value[key] for key in ('start', 'end', 'label')},
             'categoryFilter': checked_categories(previous.get('categoryFilter', [])),
             'importantOnly': bool(previous.get('importantOnly')), 'listOnly': bool(previous.get('listOnly')),
-            'inspectTitle': previous.get('inspectTitle')}
+            'inspectTitle': previous.get('inspectTitle'), 'convertLunar': bool(previous.get('convertLunar'))}
 
 
 def explicit_period(question):
@@ -222,6 +228,12 @@ def interpret_command(question, timezone='Asia/Seoul', now=None, context=None):
                'clarification': result.get('clarification'), 'categoryFilter': checked_categories(result.get('categoryFilter', [])),
                'importantCategories': preferences, 'timezone': timezone, 'reusePrevious': False,
                'listOnly': bool(result.get('listOnly')), 'inspectTitle': result.get('inspectTitle')}
+    unsupported_write = re.search(r'(?:삭제|지워|지우|발송|전송|보내)\s*(?:해|줘|주세요|버려|하)|삭제해|지워줘|보내줘|발송해', question)
+    if unsupported_write:
+        return {'action': 'unknown', 'clarification': '현재 일정 삭제·수정과 메일 발송은 지원하지 않아요. 일정 조회·생성, 메일 검색·요약과 답장 초안은 지원합니다.'}
+    if result.get('unsupported'):
+        return {'action': 'unknown', 'clarification': result.get('clarification') or '현재 일정 삭제·수정과 메일 발송은 지원하지 않아요.'}
+    command['convertLunar'] = bool(result.get('convertLunar')) and bool(re.search(r'양력|변환|convert|solar', question, re.I))
     period = explicit_period(question)
     omission = bool(re.search(r'누락|빠졌|빠져|빠진|안\s*보', question))
     mail_request = bool(re.search(r'메일|이메일|답장|회신', question))
@@ -237,7 +249,7 @@ def interpret_command(question, timezone='Asia/Seoul', now=None, context=None):
             updated = list(dict.fromkeys(preferences + updated))
         return {'action': 'preference_update', 'importantCategories': updated,
                 'clarification': '중요 일정 기준을 ' + ', '.join(CATEGORY_LABELS[key] for key in updated) + '로 기억할게요. 이 대화에서 다음 조회부터 적용합니다.'}
-    followup = previous and not mail_request and not dated_question and (omission or requested_categories or re.search(r'목록|추려|앞에|앞에서|위\s*일정|그중|그\s*일정', question))
+    followup = previous and not mail_request and not dated_question and (result.get('reusePrevious') or command['convertLunar'] or omission or requested_categories or re.search(r'목록|추려|앞에|앞에서|위\s*일정|그중|그\s*일정', question))
     calendar_request = re.search(r'일정|캘린더|스케줄|생일|생신|기념일', question) and not re.search(r'메일|이메일', question)
     if omission and previous and not mail_request:
         command.update(action='calendar_read', inspectTitle=omission_title(question) or result.get('inspectTitle'), clarification=None)
@@ -268,9 +280,10 @@ def interpret_command(question, timezone='Asia/Seoul', now=None, context=None):
         inherit = previous and not dated_question and (followup or result.get('reusePrevious') or result['range']['kind'] == 'previous')
         if inherit:
             command['range'] = previous['range']
+            command['convertLunar'] = command['convertLunar'] or previous.get('convertLunar', False)
             command['reusePrevious'] = not omission
         else:
-            if requested_categories and not dated_question and not previous:
+            if (requested_categories or command['convertLunar']) and not dated_question and not previous:
                 return {'action': 'unknown', 'clarification': '어느 기간의 일정을 확인할까요? 예: 앞으로 3개월, 이번 주.'}
             try:
                 command['range'] = date_range(period or result['range'], now)

@@ -2,6 +2,7 @@
 import re
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
+from lunar_calendar import convert_events
 
 CATEGORY_LABELS = {
     'birthday': '생일·생신', 'anniversary': '기념일', 'deadline': '마감',
@@ -99,7 +100,10 @@ def calendar_answer(data):
     for event in events:
         if not isinstance(event, dict) or not isinstance(event.get('title'), str) or not isinstance(event.get('start'), str):
             raise ValueError('invalid event')
-    selected = sorted(select_events(events, command), key=lambda event: (event_start_key(event, zone), event['title'], event.get('id', '')))
+    filtered, notes = select_events(events, command), []
+    if command.get('convertLunar'):
+        filtered, notes = convert_events(filtered, command, zone)
+    selected = sorted(filtered, key=lambda event: (event_start_key(event, zone), event['title'], event.get('id', '')))
     scope = data.get('scope', {})
     partial = data.get('truncated') or scope.get('failedCalendars') or scope.get('skippedCalendars')
     lines = [f'조회 기간: {command["range"]["label"]} · 시간대: {zone.key}']
@@ -122,11 +126,16 @@ def calendar_answer(data):
         lines.append('중요 일정 기준: ' + ', '.join(CATEGORY_LABELS[key] for key in chosen))
     for event in selected:
         lines.append(f'- {event_time(event, zone)} · {event["title"]}')
+        if event.get('conversionNote'):
+            lines.append('  ' + event['conversionNote'])
         if not command.get('listOnly'):
             if event.get('calendarName'):
                 lines.append(f'  캘린더: {event["calendarName"]}')
             if event.get('location'):
                 lines.append(f'  장소: {event["location"]}')
+    if command.get('convertLunar'):
+        lines.append('조회된 일정의 음력 월·일을 조회 기간 연도로 계산했습니다. Google Calendar 원본은 변경하지 않았습니다.')
+        lines.extend(notes)
     if scope.get('calendarCount'):
         lines.append(f'조회한 캘린더: {scope["calendarCount"]}개')
     if partial:

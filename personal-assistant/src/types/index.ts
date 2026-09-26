@@ -10,3 +10,5 @@ export interface CalendarResults { events: CalendarItem[]; truncated: boolean; s
 export interface ConversationContext { calendarCommand?: Command; importantCategories?: CalendarCategory[]; lastTopic?: 'calendar' | 'mail' }
 export interface CalendarSnapshot { command: Command; results: CalendarResults }
 export interface Answer { id: number; question: string; text: string; kind: 'success' | 'error' | 'info' }
+export interface Command { convertLunar?: boolean }
+export interface CalendarItem { originalStart?: string; conversionNote?: string }

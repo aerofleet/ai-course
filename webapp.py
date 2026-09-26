@@ -166,7 +166,7 @@ def health():
     from assistant_api import model_name
     import os
     return jsonify({"status": "ok", "assistant": {"provider": "openai", "model": model_name(),
-                   "calendar_answers": "source_records", "conversation_context": True,
+                    "calendar_answers": "source_records", "conversation_context": True, "lunar_conversion": True,
                    "configured": bool(os.getenv('OPENAI_API_KEY') and (os.getenv('ASSISTANT_GOOGLE_CLIENT_ID') or os.getenv('VITE_GOOGLE_CLIENT_ID')))}})
 
 

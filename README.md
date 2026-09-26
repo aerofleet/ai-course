@@ -179,3 +179,13 @@ python assistant_chain.py
 | `ModuleNotFoundError` | 패키지 미설치 | `pip install -r requirements.txt` 실행 |
 | `ConnectionError` | 인터넷 연결 문제 | 네트워크 상태 확인 |
 | `RateLimitError` | API 사용량 초과 | OpenAI 결제 설정 확인 |
+# 후속 조회와 한국 음력 날짜 표시 변환 (2026-09-26)
+
+- OKR 연결: 가족 생일·기념일 조회를 같은 대화에서 완료할 수 있도록 한다.
+- 목표 KPI/합격 기준: 기존 회귀 및 음력 변환 평가셋 실패 0건, 실제 OpenAI 대화 11/11 통과.
+- 검증 결과: Python 45/45, 프론트엔드 12/12, TypeScript/Vite 빌드 성공, 실제 OpenAI 대화 11/11 통과.
+- Before: 음력 변환 도구 없음. After: `convertLunar`를 구조화된 명령으로 전달하며 직전 기간·필터·변환 상태를 유지한다. 지원하지 않는 삭제·수정·발송은 조회로 바꾸지 않고 지원 한계를 설명한다.
+- 평가셋: 고정 한국 시각, 합성 가족 일정, 음력 2026-01-01 → 양력 2026-02-17, 시간/종일 일정, 윤달 모호성, 원본 불변, 반복 변환, 기간 외 제외, 지원하지 않는 작업 및 실제 OpenAI 후속 대화. 검증: `python -m unittest discover -s tests`, `npm test --prefix personal-assistant`, `npm run build --prefix personal-assistant`, `PYTHONPATH=. python tests/smoke_calendar_conversation_live.py`.
+- 변환 근거: [한국 음양력 변환 라이브러리](https://github.com/usingsky/korean_lunar_calendar_py), `korean-lunar-calendar==0.4.0`. 지원 연도 1000~2050. 모델이 날짜를 계산하지 않는다.
+- 제목에 `음력 10/10` 또는 `음력 10월 10일`처럼 월·일이 명시된 조회 결과만 조회 기간 연도로 계산한다. 월·일 누락과 평달/윤달 모호성은 등록일을 유지하고 구체적으로 표시한다. 이미 변환된 등록일은 이동하지 않는다. Google Calendar 원본은 변경하지 않는다.
+- 한계: 조회된 원본 일정만 변환하므로 원래 조회 범위 밖에 등록된 음력 일정까지 발견한다고 보장하지 않는다. 월·일 추가 답변을 원본 일정에 반영하는 기능은 아직 없다. 실제 사용자 Google 계정 E2E는 미검증이다.

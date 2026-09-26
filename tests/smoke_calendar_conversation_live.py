@@ -52,3 +52,17 @@ for index, question in enumerate(questions):
     print({'case': index + 1, 'action': command['action'], 'verified': True})
 assert answers[-1] == answers[-2], 'Repeated query changed the answer'
 print({'provider': 'openai', 'conversation_cases_passed': 8, 'source_dates_verified': True})
+for question in ['음력은 양력 날짜로 변경해서 다시 추려줘', '목록만 보여줘']:
+    command = interpret_command(question, now=now, context=context)
+    assert command['action'] == 'calendar_read' and command['reusePrevious'], command
+    assert command['convertLunar'], command
+    assert command['range'] == context['calendarCommand']['range'], command
+    text, selected = calendar_answer({'command': command, 'events': events})
+    father = next(item for item in selected if item['id'] == 'father')
+    assert father['start'] == '2026-11-18T10:30:00+09:00', father
+    assert '변환 보류' in text, text
+    context['calendarCommand'] = command
+    print({'lunar_followup': True, 'verified': True})
+command = interpret_command('생일 목록을 모두 삭제해줘', now=now, context=context)
+assert command['action'] == 'unknown' and command.get('clarification'), command
+print({'unsupported_write_blocked': True, 'conversation_cases_passed': 11})
