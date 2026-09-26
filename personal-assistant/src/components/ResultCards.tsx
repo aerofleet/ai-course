@@ -3,7 +3,7 @@ import { formatEventTime } from '../utils/format'
 
 export function CalendarCards({ items }: { items: CalendarItem[] }) {
   return <div className="card-list">{items.length ? items.map(item => <article className="item-card" key={item.id}>
-    <span className="item-icon calendar-icon">▦</span><div><h3>{item.title}</h3><p>{formatEventTime(item.start, item.end)}</p>{item.location && <p>장소 · {item.location}</p>}</div>
+    <span className="item-icon calendar-icon">▦</span><div><h3>{item.title}</h3><p>{formatEventTime(item.start, item.end)}</p>{item.calendarName && <p>캘린더 · {item.calendarName}</p>}{item.location && <p>장소 · {item.location}</p>}</div>
     {item.link && <a href={item.link} target="_blank" rel="noreferrer" aria-label={`${item.title} Google Calendar에서 열기`}>↗</a>}
   </article>) : <p className="empty">표시할 일정이 없어요.</p>}</div>
 }

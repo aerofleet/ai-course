@@ -1,4 +1,4 @@
-import type { CalendarItem, Command, MailItem } from '../types'
+import type { CalendarItem, CalendarResults, Command, ConversationContext, MailItem } from '../types'
 import { getToken, hasToken, SCOPES } from './googleAuthService'
 
 async function assistantFetch<T>(path: string, data: unknown): Promise<T> {
@@ -22,15 +22,14 @@ async function assistantFetch<T>(path: string, data: unknown): Promise<T> {
   } finally { window.clearTimeout(timeout) }
 }
 
-export async function interpret(question: string): Promise<Command> {
+export async function interpret(question: string, context: ConversationContext = {}): Promise<Command> {
   type WireCommand = Omit<Command, 'create'> & { create?: { title: string; start: string; end: string } }
   const { command } = await assistantFetch<{ command: WireCommand }>('interpret', {
-    question, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    question, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, context,
   })
   return { ...command, create: command.create ? { ...command.create, start: new Date(command.create.start), end: new Date(command.create.end) } : undefined }
 }
 
-export async function answerQuestion(question: string, command: Command, results: { events?: CalendarItem[]; mails?: MailItem[]; truncated?: boolean }): Promise<string> {
-  const { answer } = await assistantFetch<{ answer: string }>('answer', { question, command, ...results })
-  return answer
+export async function answerQuestion(question: string, command: Command, results: Partial<CalendarResults> & { mails?: MailItem[] }): Promise<{ answer: string; events?: CalendarItem[] }> {
+  return assistantFetch<{ answer: string; events?: CalendarItem[] }>('answer', { question, command, ...results })
 }

@@ -63,7 +63,7 @@ jobs:
             pip install -r requirements.txt --quiet
             export ASSISTANT_GOOGLE_CLIENT_ID="$VITE_GOOGLE_CLIENT_ID"
             python -m unittest discover -s tests -v
-            PYTHONPATH=. python tests/smoke_assistant_live.py
+            PYTHONPATH=. python tests/smoke_calendar_conversation_live.py
 
             # webapp 재시작 (screen 세션)
             screen -S webapp -X quit 2>/dev/null || true

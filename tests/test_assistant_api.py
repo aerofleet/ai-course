@@ -58,12 +58,12 @@ class AssistantTests(unittest.TestCase):
         self.assertNotIn('오늘', result)
         llm.assert_not_called()
 
-    def test_next_month_event_is_passed_to_answer_model(self):
+    def test_next_month_event_is_rendered_without_answer_model(self):
         data = {'question': '3개월 중요한 일정', 'command': {'action': 'calendar_read', 'importantOnly': True, 'range': {'label': '앞으로 3개월'}},
                 'events': [{'title': '면접', 'start': '2026-10-12T14:00:00+09:00'}]}
         with patch.object(api, 'openai_response', return_value='10월 12일 면접') as llm:
             self.assertIn('면접', api.answer_question(data))
-        self.assertEqual(llm.call_args.args[1]['events'], data['events'])
+        llm.assert_not_called()
 
     def test_creation_keeps_explicit_duration_and_never_writes(self):
         result = self.command()
