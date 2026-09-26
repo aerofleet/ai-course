@@ -104,6 +104,40 @@ class AssistantTests(unittest.TestCase):
                 api.authorize()
         self.assertEqual(error.exception.status, 429)
 
+    def test_separate_gmail_client_accepts_only_its_scope(self):
+        for audience, scope, accepted in [
+                ('gmail-client', 'gmail.readonly', True),
+                ('calendar-client', 'calendar.readonly', True),
+                ('gmail-client', 'calendar.readonly', False),
+                ('calendar-client', 'gmail.readonly', False),
+                ('untrusted-client', 'gmail.readonly', False)]:
+            with self.subTest(audience=audience, scope=scope):
+                info = {'aud': audience, 'scope': 'https://www.googleapis.com/auth/' + scope, 'expires_in': '300', 'sub': 'user'}
+                with patch.dict(os.environ, {'ASSISTANT_GOOGLE_CLIENT_ID': 'calendar-client', 'ASSISTANT_GOOGLE_GMAIL_CLIENT_ID': 'gmail-client'}), patch.object(api.requests, 'get', return_value=Mock(ok=True, json=lambda: info)), self.client.application.test_request_context(headers={'Authorization': 'Bearer fake'}):
+                    if accepted:
+                        api.authorize()
+                    else:
+                        with self.assertRaises(api.AssistantError) as error:
+                            api.authorize()
+                        self.assertEqual(error.exception.status, 401)
+
+    def test_separate_gmail_client_accepts_only_its_scope(self):
+        for audience, scope, accepted in [
+                ('gmail-client', 'gmail.readonly', True),
+                ('calendar-client', 'calendar.readonly', True),
+                ('gmail-client', 'calendar.readonly', False),
+                ('calendar-client', 'gmail.readonly', False),
+                ('untrusted-client', 'gmail.readonly', False)]:
+            with self.subTest(audience=audience, scope=scope):
+                info = {'aud': audience, 'scope': 'https://www.googleapis.com/auth/' + scope, 'expires_in': '300', 'sub': 'user'}
+                with patch.dict(os.environ, {'ASSISTANT_GOOGLE_CLIENT_ID': 'calendar-client', 'ASSISTANT_GOOGLE_GMAIL_CLIENT_ID': 'gmail-client'}), patch.object(api.requests, 'get', return_value=Mock(ok=True, json=lambda: info)), self.client.application.test_request_context(headers={'Authorization': 'Bearer fake'}):
+                    if accepted:
+                        api.authorize()
+                    else:
+                        with self.assertRaises(api.AssistantError) as error:
+                            api.authorize()
+                        self.assertEqual(error.exception.status, 401)
+
     def test_openai_error_does_not_expose_key_or_fall_back(self):
         with patch.dict(os.environ, {'OPENAI_API_KEY': 'test-secret'}), patch.object(api.requests, 'post', return_value=Mock(ok=False, status_code=401)):
             with self.assertRaises(api.AssistantError) as error:

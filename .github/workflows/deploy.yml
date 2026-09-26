@@ -25,6 +25,7 @@ jobs:
         working-directory: personal-assistant
         env:
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID || secrets.VITE_GOOGLE_CLIENT_ID }}
+          VITE_GOOGLE_GMAIL_CLIENT_ID: ${{ vars.VITE_GOOGLE_GMAIL_CLIENT_ID || secrets.VITE_GOOGLE_GMAIL_CLIENT_ID }}
         run: |
           test -n "$VITE_GOOGLE_CLIENT_ID"
           case "$VITE_GOOGLE_CLIENT_ID" in
@@ -42,11 +43,12 @@ jobs:
         uses: appleboy/ssh-action@v1
         env:
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID || secrets.VITE_GOOGLE_CLIENT_ID }}
+          VITE_GOOGLE_GMAIL_CLIENT_ID: ${{ vars.VITE_GOOGLE_GMAIL_CLIENT_ID || secrets.VITE_GOOGLE_GMAIL_CLIENT_ID }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: VITE_GOOGLE_CLIENT_ID
+          envs: VITE_GOOGLE_CLIENT_ID,VITE_GOOGLE_GMAIL_CLIENT_ID
           script: |
             set -e
             test -n "$VITE_GOOGLE_CLIENT_ID"
@@ -62,6 +64,7 @@ jobs:
             source ~/ai-venv/bin/activate
             pip install -r requirements.txt --quiet
             export ASSISTANT_GOOGLE_CLIENT_ID="$VITE_GOOGLE_CLIENT_ID"
+            export ASSISTANT_GOOGLE_GMAIL_CLIENT_ID="$VITE_GOOGLE_GMAIL_CLIENT_ID"
             python -m unittest discover -s tests -v
             PYTHONPATH=. python tests/smoke_calendar_conversation_live.py
 

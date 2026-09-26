@@ -181,6 +181,14 @@ python assistant_chain.py
 | `RateLimitError` | API 사용량 초과 | OpenAI 결제 설정 확인 |
 # 후속 조회와 한국 음력 날짜 표시 변환 (2026-09-26)
 
+## Gmail 전용 OAuth 클라이언트 연결
+
+- `VITE_GOOGLE_GMAIL_CLIENT_ID`를 Gmail 버튼에 사용하고 서버는 `ASSISTANT_GOOGLE_GMAIL_CLIENT_ID`로 Gmail 읽기 토큰의 발급 대상을 확인한다. 미설정이면 기존 공용 클라이언트를 사용한다. Calendar 클라이언트 설정은 별개다.
+- 배포 변수는 GitHub Actions에서 프론트 빌드와 서버 시작 환경에 전달한다. Google Identity Services token model을 사용하므로 Client Secret을 저장하거나 브라우저에 전달하지 않는다.
+- Google Cloud의 해당 웹 클라이언트에 승인된 JavaScript 원본 `<APP_ORIGIN>`을 등록하고 Gmail API와 `gmail.readonly` 권한을 활성화해야 한다. 앱이 Testing 상태면 로그인 계정을 Test users에 등록해야 한다. 사용자가 Gmail 연결 버튼에서 직접 동의해야 연결이 완료된다.
+- OKR 연결: 메일 조회·요약을 같은 비서에서 제공한다. KPI/합격 기준: 클라이언트/권한 조합 인증 평가 5/5, 전체 Python 52/52, 프론트 13/13, 빌드 성공. Before: Gmail도 Calendar 클라이언트 사용. After: 전용 Gmail 클라이언트 및 권한을 구분한다. 실제 Google 계정 동의·메일 조회는 사용자 로그인 없이는 미검증이다.
+- 검증 명령: `python -m unittest discover -s tests`, `npm test --prefix personal-assistant`, `npm run build --prefix personal-assistant`.
+
 - OKR 연결: 가족 생일·기념일 조회를 같은 대화에서 완료할 수 있도록 한다.
 - 목표 KPI/합격 기준: 기존 회귀 및 음력 변환 평가셋 실패 0건, 실제 OpenAI 대화 14/14 통과.
 - 평가셋: Python 51건, 프론트엔드 12건, 실제 OpenAI 대화 14건. 복합 생일·기념일·음력 변환 요청과 등록일 기반 변환, 한국 시간 유지 및 원본 불변을 검증한다.

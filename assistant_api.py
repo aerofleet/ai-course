@@ -38,7 +38,8 @@ def authorize():
     if not token or not request.headers.get('Authorization', '').startswith('Bearer '):
         raise AssistantError('먼저 Google Calendar 또는 Gmail을 연결해 주세요.', 401)
     client_id = os.getenv('ASSISTANT_GOOGLE_CLIENT_ID') or os.getenv('VITE_GOOGLE_CLIENT_ID')
-    if not client_id:
+    gmail_client_id = os.getenv('ASSISTANT_GOOGLE_GMAIL_CLIENT_ID') or os.getenv('VITE_GOOGLE_GMAIL_CLIENT_ID') or client_id
+    if not client_id and not gmail_client_id:
         raise AssistantError('서버의 Google Client ID 설정이 필요합니다.', 503)
     try:
         response = requests.get('https://oauth2.googleapis.com/tokeninfo',
@@ -48,9 +49,12 @@ def authorize():
         raise AssistantError('Google 접속 권한을 확인하지 못했어요. 다시 시도해 주세요.', 502)
     audience = info.get('aud') or info.get('issued_to') or info.get('azp')
     scopes = set(info.get('scope', '').split())
-    allowed = {'https://www.googleapis.com/auth/calendar.readonly',
-               'https://www.googleapis.com/auth/gmail.readonly'}
-    if audience != client_id or not scopes.intersection(allowed) or int(info.get('expires_in', 0)) <= 0:
+    allowed = set()
+    if client_id and audience == client_id:
+        allowed.add('https://www.googleapis.com/auth/calendar.readonly')
+    if gmail_client_id and audience == gmail_client_id:
+        allowed.add('https://www.googleapis.com/auth/gmail.readonly')
+    if not scopes.intersection(allowed) or int(info.get('expires_in', 0)) <= 0:
         raise AssistantError('Google 접속 권한이 만료됐거나 올바르지 않아요. 다시 연결해 주세요.', 401)
     # A single-process deployment; never retain raw bearer tokens.
     identity = hashlib.sha256((str(info.get('sub') or info.get('user_id')) + audience).encode()).hexdigest()
