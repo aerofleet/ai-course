@@ -90,3 +90,18 @@ text, selected = calendar_answer({'command': command, 'events': events})
 assert next(item for item in selected if item['id'] == 'mother')['start'] == '2026-12-18', text
 assert len(selected) == 5 and '변환 보류' not in text, text
 print({'combined_birthday_anniversary_lunar_query': True, 'conversation_cases_passed': 14})
+team_context = {'teamMembers': ['member1@example.com', 'member2@example.com']}
+command = interpret_command('내일 오전 회의 일정 정리하고 팀에 공유해줘', now=now, context=team_context)
+assert command['action'] == 'unknown' and command.get('pendingRequest'), command
+team_context['pendingRequest'] = command['pendingRequest']
+command = interpret_command('오전 10시부터 11시까지로 해줘', now=now, context=team_context)
+assert command['action'] == 'calendar_create', command
+assert command['create']['start'] == '2026-09-27T10:00:00+09:00', command
+assert command['create']['end'] == '2026-09-27T11:00:00+09:00', command
+assert command['create']['attendees'] == team_context['teamMembers'], command
+command = interpret_command('내일 오전 10시부터 11시까지 회의 만들고 팀에 공유해줘', now=now, context={})
+assert command['action'] == 'unknown' and command.get('pendingRequest'), command
+command = interpret_command('member1@example.com과 member2@example.com에게 초대해줘', now=now, context={'pendingRequest': command['pendingRequest']})
+assert command['action'] == 'calendar_create', command
+assert command['create']['attendees'] == ['member1@example.com', 'member2@example.com'], command
+print({'team_share_clarification_and_resume': True, 'conversation_cases_passed': 18})

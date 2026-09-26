@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 
 import requests
 from dotenv import load_dotenv
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, g
 from calendar_assistant import (CATEGORY_LABELS, DEFAULT_IMPORTANT, calendar_answer,
                                 categories, checked_categories, omission_title)
 
@@ -33,7 +33,7 @@ def model_name():
     return os.getenv('ASSISTANT_OPENAI_MODEL', 'gpt-5-nano')
 
 
-def authorize():
+def authorize(write=False):
     token = request.headers.get('Authorization', '').removeprefix('Bearer ')
     if not token or not request.headers.get('Authorization', '').startswith('Bearer '):
         raise AssistantError('먼저 Google Calendar 또는 Gmail을 연결해 주세요.', 401)
@@ -51,8 +51,8 @@ def authorize():
     scopes = set(info.get('scope', '').split())
     allowed = set()
     if client_id and audience == client_id:
-        allowed.add('https://www.googleapis.com/auth/calendar.readonly')
-    if gmail_client_id and audience == gmail_client_id:
+        allowed.add('https://www.googleapis.com/auth/calendar.events' if write else 'https://www.googleapis.com/auth/calendar.readonly')
+    if not write and gmail_client_id and audience == gmail_client_id:
         allowed.add('https://www.googleapis.com/auth/gmail.readonly')
     if not scopes.intersection(allowed) or int(info.get('expires_in', 0)) <= 0:
         raise AssistantError('Google 접속 권한이 만료됐거나 올바르지 않아요. 다시 연결해 주세요.', 401)
@@ -69,6 +69,7 @@ def authorize():
         if len(calls) >= 30:
             raise AssistantError('요청이 많아요. 1분 후 다시 시도해 주세요.', 429)
         calls.append(now)
+    g.assistant_identity = identity
 
 
 def openai_response(instructions, data, schema=None):
@@ -119,9 +120,14 @@ COMMAND_SCHEMA = object_schema({
     'convertLunar': {'type': 'boolean'},
     'unsupported': {'type': 'boolean'},
     'lunarDate': {'anyOf': [object_schema({'month': {'type': 'integer'}, 'day': {'type': 'integer'}, 'leap': {'type': ['boolean', 'null']}}), {'type': 'null'}]},
+    'shareWithTeam': {'type': 'boolean'},
 })
 
 INTERPRET_PROMPT = """한국어 개인 비서의 명령을 구조화한다. 입력의 question은 명령이며 now/timezone은 기준 시각이다.
+회의를 만들거나 잡고 팀에 공유/초대하는 복합 요청은 calendar_create와 shareWithTeam=true다. 공유는 캘린더 초대 알림으로 지원한다. shareWithTeam은 나머지 요청에서 false다.
+context.pendingRequest는 미완료 생성 요청이다. 시간/이메일 같은 추가 답변을 이 요청과 합쳐 해석한다. context.teamMembers는 사용자가 입력한 팀 이메일이다.
+오전/오후만 있고 구체적인 시간이 없으면 시작 시간을 질문한다. 회의 생성·공유 요청을 메일 검색으로 바꾸지 않는다. 팀이 비어 있으면 이메일을 질문한다.
+시간·제목·팀 이메일이 확보되면 반드시 calendar_create와 title/start/end를 채우고 clarification=null을 반환한다. 생성·초대 여부 확인은 앱의 별도 승인 화면이 담당하므로 해석 단계에서 재확인을 묻지 않는다.
 후속 요청은 표현을 외우지 말고 context의 작업을 이어받아 처리한다. 이전 목록의 변환/재정리/표시 변경은 calendar_read, reusePrevious=true, range.kind=previous다.
 특정 일정의 양력 변환 요청은 inspectTitle에 그 일정 제목만 지정한다. 붙여 넣은 카드 날짜는 새 조회 기간이 아니다.
 음력 월·일이 추가 답변으로 주어지면 lunarDate에 기록하고 이전 inspectTitle과 조회 범위를 유지한다. lunarDate는 질문에서 명시된 음력 월·일만 사용한다. 없으면 null이다. 평달 leap=false, 윤달 true, 미지정 null. 제목에 음력 표기만 있으면 서버가 등록일의 월·일을 음력 기준으로 사용하므로 월·일 누락을 이유로 질문하지 않는다.
@@ -217,6 +223,12 @@ def explicit_period(question):
     return None
 
 
+def checked_emails(value):
+    if not isinstance(value, list) or len(value) > 50 or any(not isinstance(email, str) or not re.fullmatch(r'[A-Za-z0-9.!#$%&\x27*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,}', email) for email in value):
+        raise AssistantError('팀 이메일을 올바르게 입력해 주세요. 최대 50명까지 초대할 수 있어요.')
+    return list(dict.fromkeys(email.lower() for email in value))
+
+
 def interpret_command(question, timezone='Asia/Seoul', now=None, context=None):
     try:
         zone = ZoneInfo(timezone)
@@ -230,12 +242,31 @@ def interpret_command(question, timezone='Asia/Seoul', now=None, context=None):
     previous = validated_previous(context)
     # Only task metadata reaches the interpreter; cached event records remain in the browser.
     safe_context = {'calendarCommand': previous, 'importantCategories': preferences,
-                    'lastTopic': context.get('lastTopic')}
+                    'lastTopic': context.get('lastTopic'), 'teamMembers': checked_emails(context.get('teamMembers', [])),
+                    'pendingRequest': str(context.get('pendingRequest', ''))[:2000]}
     result = openai_response(INTERPRET_PROMPT, {'question': question, 'now': now.isoformat(), 'timezone': timezone, 'context': safe_context}, COMMAND_SCHEMA)
     command = {'action': result['action'], 'query': result.get('query') or '', 'importantOnly': bool(result.get('importantOnly')),
                'clarification': result.get('clarification'), 'categoryFilter': checked_categories(result.get('categoryFilter', [])),
                'importantCategories': preferences, 'timezone': timezone, 'reusePrevious': False,
                'listOnly': bool(result.get('listOnly')), 'inspectTitle': result.get('inspectTitle')}
+    pending_context = safe_context['pendingRequest'] if result['action'] in ('calendar_create', 'unknown') else ''
+    combined_request = pending_context + ' ' + question
+    share = bool(result.get('shareWithTeam') or re.search(r'공유|초대', combined_request))
+    if share or (pending_context and result['action'] == 'calendar_create'):
+        emails = re.findall(r'[A-Za-z0-9.!#$%&\x27*+/=?^_`{|}~-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}', combined_request)
+        attendees = checked_emails(emails or safe_context['teamMembers']) if share else []
+        pending_request = combined_request.strip()[-2000:]
+        if result.get('unsupported'):
+            return {'action': 'unknown', 'clarification': result.get('clarification') or '공유는 회의 생성 시 캘린더 초대로 지원합니다.'}
+        explicit_time = re.search(r'\d{1,2}\s*시|\d{1,2}:\d{2}|정오|자정|(?:한|두|세|네|다섯|여섯|일곱|여덟|아홉|열|열한|열두)\s*시|\d{1,2}\s*(?:am|pm)', combined_request, re.I)
+        if not explicit_time:
+            return {'action': 'unknown', 'pendingRequest': pending_request, 'clarification': '회의를 몇 시에 시작할까요? 예: “오전 10시부터 11시까지”.'}
+        if not result.get('title') or not result.get('start') or not result.get('end') or (share and not attendees):
+            return {'action': 'unknown', 'pendingRequest': pending_request, 'clarification': result.get('clarification') or ('공유할 팀 이메일을 입력해 주세요.' if share and not attendees else '회의 제목과 시작 시간을 알려 주세요.')}
+        start, end = datetime.fromisoformat(result['start']), datetime.fromisoformat(result['end'])
+        if start.tzinfo is None or end.tzinfo is None or start <= now or end <= start:
+            raise AssistantError('미래의 회의 시작·종료 시간을 알려 주세요.')
+        return {'action': 'calendar_create', 'create': {'title': result['title'], 'start': start.isoformat(), 'end': end.isoformat(), 'attendees': attendees}, 'timezone': timezone}
     unsupported_write = re.search(r'(?:삭제|지워|지우|발송|전송|보내)\s*(?:해|줘|주세요|버려|하)|삭제해|지워줘|보내줘|발송해', question)
     if unsupported_write:
         return {'action': 'unknown', 'clarification': '현재 일정 삭제·수정과 메일 발송은 지원하지 않아요. 일정 조회·생성, 메일 검색·요약과 답장 초안은 지원합니다.'}
@@ -346,9 +377,9 @@ def answer_question(data):
     return openai_response(ANSWER_PROMPT, data)
 
 
-def handle(operation):
+def handle(operation, write=False):
     try:
-        authorize()
+        authorize(write=write)
         data = request.get_json(silent=True)
         if not isinstance(data, dict) or not isinstance(data.get('question'), str) or not 1 <= len(data['question'].strip()) <= 2000:
             raise AssistantError('질문을 1~2,000자로 입력해 주세요.')
@@ -361,14 +392,17 @@ def handle(operation):
 
 @assistant_api.post('/api/assistant/interpret')
 def interpret():
-    return handle(lambda data: {'command': interpret_command(data['question'], data.get('timezone', 'Asia/Seoul'), context=data.get('context')), 'model': model_name()})
+    from assistant_graph import run_assistant
+    return handle(lambda data: run_assistant('interpret', data))
 
 
 @assistant_api.post('/api/assistant/answer')
 def answer():
-    def operation(data):
-        if data.get('command', {}).get('action') == 'calendar_read':
-            text, selected = calendar_answer(data)
-            return {'answer': text, 'events': selected}
-        return {'answer': answer_question(data), 'model': model_name()}
-    return handle(operation)
+    from assistant_graph import run_assistant
+    return handle(lambda data: run_assistant('answer', data))
+
+
+@assistant_api.post('/api/assistant/execute')
+def execute():
+    from assistant_graph import run_assistant
+    return handle(lambda data: run_assistant('execute', data, request.headers['Authorization'].removeprefix('Bearer '), g.assistant_identity), write=True)

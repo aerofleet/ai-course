@@ -12,3 +12,6 @@ export interface CalendarSnapshot { command: Command; results: CalendarResults }
 export interface Answer { id: number; question: string; text: string; kind: 'success' | 'error' | 'info' }
 export interface Command { convertLunar?: boolean; lunarDate?: { month: number; day: number; leap: boolean | null } | null }
 export interface CalendarItem { originalStart?: string; conversionNote?: string }
+export interface CreateRequest { attendees?: string[]; operationId?: string }
+export interface Command { pendingRequest?: string }
+export interface ConversationContext { teamMembers?: string[]; pendingRequest?: string }

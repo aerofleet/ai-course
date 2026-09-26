@@ -1,8 +1,8 @@
-import type { CalendarItem, CalendarResults, Command, ConversationContext, MailItem } from '../types'
+import type { CalendarItem, CalendarResults, Command, ConversationContext, CreateRequest, MailItem } from '../types'
 import { getToken, hasToken, SCOPES } from './googleAuthService'
 
 async function assistantFetch<T>(path: string, data: unknown): Promise<T> {
-  const scope = hasToken(SCOPES.calendarRead) ? SCOPES.calendarRead : SCOPES.gmailRead
+  const scope = path === 'execute' ? SCOPES.calendarWrite : hasToken(SCOPES.calendarRead) ? SCOPES.calendarRead : SCOPES.gmailRead
   if (!hasToken(scope)) throw new Error('먼저 Google Calendar 또는 Gmail을 연결해 주세요.')
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), 90000)
@@ -23,7 +23,7 @@ async function assistantFetch<T>(path: string, data: unknown): Promise<T> {
 }
 
 export async function interpret(question: string, context: ConversationContext = {}): Promise<Command> {
-  type WireCommand = Omit<Command, 'create'> & { create?: { title: string; start: string; end: string } }
+  type WireCommand = Omit<Command, 'create'> & { create?: { title: string; start: string; end: string; attendees?: string[] } }
   const { command } = await assistantFetch<{ command: WireCommand }>('interpret', {
     question, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, context,
   })
@@ -32,4 +32,8 @@ export async function interpret(question: string, context: ConversationContext =
 
 export async function answerQuestion(question: string, command: Command, results: Partial<CalendarResults> & { mails?: MailItem[] }): Promise<{ answer: string; events?: CalendarItem[] }> {
   return assistantFetch<{ answer: string; events?: CalendarItem[] }>('answer', { question, command, ...results })
+}
+
+export async function executeCreate(create: CreateRequest): Promise<{ event: CalendarItem; answer: string }> {
+  return assistantFetch('execute', { question: '일정 생성 및 팀 초대 확인', approved: true, operationId: create.operationId, create: { title: create.title, start: create.start.toISOString(), end: create.end.toISOString(), attendees: create.attendees || [] } })
 }

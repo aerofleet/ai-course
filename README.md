@@ -181,6 +181,17 @@ python assistant_chain.py
 | `RateLimitError` | API 사용량 초과 | OpenAI 결제 설정 확인 |
 # 후속 조회와 한국 음력 날짜 표시 변환 (2026-09-26)
 
+## 비서용 LangGraph 및 팀 공유 (2026-09-27)
+
+- 실제 비서 API의 명령 해석과 응답 생성을 `assistant_graph.py`의 LangGraph로 연결한다. 실행 경로는 `승인·입력 검증 → 일정 생성 및 초대 → 결과 보고`다. 실행 API는 Calendar 웹 클라이언트로 발급된 `calendar.events` 토큰을 검증한다.
+- 팀 이메일 입력란에 쉼표로 구분해 최대 50명을 입력하거나 명령에 이메일을 명시한다. `내일 오전 10시부터 11시까지 회의 만들고 팀에 공유해줘`를 입력하면 제목·시간·초대 대상을 표시한다. `확인하고 생성·공유` 승인 후 생성한다. 공유 방식은 Calendar 참석자 초대(`attendees`, `sendUpdates=all`)이며 별도 Gmail 안내 메일 발송은 아니다.
+- 오전/오후만 입력하면 시작 시간을 질문한다. 팀 이메일이 없으면 이메일을 질문한다. 추가 답변은 미완료 요청과 합쳐 해석한다. 정보가 확보되면 중복 질문 대신 승인 화면으로 진행한다.
+- 사용자별 작업 ID에서 Google 이벤트 ID를 생성한다. 응답 시간 초과 후 같은 확인 버튼으로 재시도하면 기존 이벤트를 조회해 복구한다. 동시 생성의 409도 기존 이벤트를 확인한다. 새로고침으로 작업 ID가 사라지거나 새 명령을 입력하면 같은 작업 재시도가 아니므로 다시 생성할 수 있다.
+- 결과는 이벤트 ID와 Google 응답에 근거한다. 초대 알림 요청 성공은 상대방의 수신·열람·참석 수락을 보장하지 않는다. 팀 목록과 미완료 요청은 화면 메모리에만 유지한다. Graph 체크포인트로 토큰을 저장하지 않는다.
+- OKR: 자연어 회의 생성과 팀 초대를 하나의 승인으로 완료한다. KPI/합격 기준: 승인 전 Google 쓰기 0건, 동일 작업 재시도 중복 생성 0건, 수신자 불일치 0건. 평가셋은 정상 생성·초대, 읽기 토큰 거부, 승인 누락, 오류·시간 초과, 재시도·동시 충돌, 이메일 오류와 실제 OpenAI 시간·수신자 추가 답변이다.
+- Before: 비서 실행 LangGraph 연결과 팀 초대 미구현. After: Graph 경로 및 Calendar 초대 구현. 검증 명령: `python -m unittest discover -s tests`, `npm test --prefix personal-assistant`, `npm run build --prefix personal-assistant`, `PYTHONPATH=. python tests/smoke_calendar_conversation_live.py`. 실제 사용자 Google 계정의 일정 생성·초대 수신 E2E는 미검증이며 별도 확인이 필요하다. 일정 충돌 확인 및 기존 이벤트의 참석자 수정은 이번 기능에 포함하지 않는다.
+- 결과: Python 68/68, 프론트엔드 15/15, 실제 OpenAI 합성 대화 18/18, TypeScript/Vite 빌드 성공. Google 생성·초대 및 실패 복구는 모의 API 응답으로 검증했다.
+
 ## Gmail 전용 OAuth 클라이언트 연결
 
 - `VITE_GOOGLE_GMAIL_CLIENT_ID`를 Gmail 버튼에 사용하고 서버는 `ASSISTANT_GOOGLE_GMAIL_CLIENT_ID`로 Gmail 읽기 토큰의 발급 대상을 확인한다. 미설정이면 기존 공용 클라이언트를 사용한다. Calendar 클라이언트 설정은 별개다.
