@@ -3,6 +3,9 @@ import traceback
 from flask import Flask, request, jsonify, render_template_string
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 512 * 1024
+from assistant_api import assistant_api
+app.register_blueprint(assistant_api)
 
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="ko">
@@ -160,7 +163,10 @@ def api_run():
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok"})
+    from assistant_api import model_name
+    import os
+    return jsonify({"status": "ok", "assistant": {"provider": "openai", "model": model_name(),
+                   "configured": bool(os.getenv('OPENAI_API_KEY') and (os.getenv('ASSISTANT_GOOGLE_CLIENT_ID') or os.getenv('VITE_GOOGLE_CLIENT_ID')))}})
 
 
 if __name__ == "__main__":

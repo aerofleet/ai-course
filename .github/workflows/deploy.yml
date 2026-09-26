@@ -18,6 +18,9 @@ jobs:
       - name: Install assistant dependencies
         working-directory: personal-assistant
         run: npm ci
+      - name: Test calendar queries
+        working-directory: personal-assistant
+        run: npm test
       - name: Build assistant
         working-directory: personal-assistant
         env:
@@ -58,6 +61,9 @@ jobs:
             test -f personal-assistant/dist/index.html
             source ~/ai-venv/bin/activate
             pip install -r requirements.txt --quiet
+            export ASSISTANT_GOOGLE_CLIENT_ID="$VITE_GOOGLE_CLIENT_ID"
+            python -m unittest discover -s tests -v
+            PYTHONPATH=. python tests/smoke_assistant_live.py
 
             # webapp 재시작 (screen 세션)
             screen -S webapp -X quit 2>/dev/null || true
@@ -65,4 +71,5 @@ jobs:
             screen -dmS webapp bash -c 'source ~/ai-venv/bin/activate && cd ~/ai-course && python webapp.py'
             sleep 2
             curl -sf http://localhost:8080/health
+            test "$(curl -sS -o /dev/null -w '%{http_code}' --resolve myai.itsdev.kr:443:127.0.0.1 -X POST -H 'Content-Type: application/json' -d '{"question":"일정 조회"}' https://myai.itsdev.kr/pipeline/api/assistant/interpret)" = 401
             curl -fsS --retry 3 --retry-all-errors --retry-delay 2 --resolve myai.itsdev.kr:443:127.0.0.1 https://myai.itsdev.kr/assistant/ > /dev/null

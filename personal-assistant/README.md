@@ -1,6 +1,6 @@
 # 하루비서
 
-React + Vite + TypeScript로 만든 브라우저 기반 개인 비서 MVP입니다. 한국어 명령을 규칙으로 분류해 Google Calendar 일정과 Gmail 메일을 보여줍니다. Gmail 요약은 최근 메일의 제목과 미리보기 텍스트를 묶어 표시하며, 답장 초안은 템플릿입니다. LLM 호출이나 메일 발송은 없습니다.
+React + Vite + TypeScript 개인 비서입니다. Flask 서버가 OpenAI Responses API(`gpt-5-nano`, `ASSISTANT_OPENAI_MODEL`로 변경 가능)로 질문을 구조화하고 실제 Google Calendar/Gmail 조회 결과로 답변을 생성합니다. Calendar/Gmail 조회는 브라우저에서 수행하고, 질문·일정 정보·메일 제목/미리보기를 서버와 OpenAI에 전달합니다. 일정 생성은 사용자 확인 후 실행하며 메일 발송 기능은 없습니다.
 
 ## 실행
 
@@ -14,6 +14,10 @@ npm run dev
 ```
 
 터미널에 표시되는 로컬 주소의 `/assistant/` 경로를 브라우저에서 엽니다. `npm run build`로 TypeScript 검사와 배포용 빌드를 검증할 수 있습니다. `.env`는 Git에 포함되지 않습니다. Vite의 `VITE_` 값은 브라우저 번들에 공개되므로 Client ID만 넣고 Client Secret이나 API 키를 넣지 마세요.
+
+저장소 루트의 서버용 `.env`에는 `OPENAI_API_KEY`와 `ASSISTANT_GOOGLE_CLIENT_ID`(프런트와 동일한 웹 OAuth Client ID)를 설정하고 `python webapp.py`를 별도 실행합니다. 개발 서버는 `/pipeline/api/assistant/`를 Flask 8080 포트로 프록시합니다. 운영은 기존 `/pipeline/` 프록시를 사용합니다. 배포 워크플로가 웹 Client ID를 서버 환경에도 전달하며 OpenAI 키는 서버의 기존 `.env`에서 읽습니다.
+
+비서 API는 Google 액세스 토큰의 Client ID·읽기 권한·만료를 검사합니다. 인증되지 않은 요청은 401이며 검증된 사용자당 분당 30회로 제한합니다. OpenAI/Google 오류 시 규칙 기반 응답으로 대체하지 않고 오류를 안내합니다. OpenAI 요청에는 `store: false`를 사용하며 서버에 질문/메일/일정/Google 토큰을 저장하지 않습니다.
 
 ## Google Cloud 설정
 
@@ -44,16 +48,16 @@ Calendar 조회는 `calendar.readonly`, 일정 생성 확인 시 `calendar.event
 ## 사용 흐름
 
 1. `Calendar 연결`을 눌러 권한을 동의합니다. 메일 기능은 `Gmail 연결`을 별도로 누릅니다.
-2. `오늘 일정 알려줘`, `이번 주 일정 보여줘`, `최근 중요한 메일 요약해줘`, `프로젝트 관련 메일 검색해줘` 등을 입력합니다.
+2. `오늘 일정 알려줘`, `앞으로 3개월 내 중요한 일정 확인해줘`, `이번 주 일정 보여줘`, `최근 중요한 메일 요약해줘`, `프로젝트 관련 메일 검색해줘` 등을 입력합니다. 상대 기간은 브라우저 시간대와 서버 시각으로 계산합니다. 기본 캘린더만 조회하며 최대 1년·500건까지 페이지를 따라 조회합니다. 500건을 넘으면 답변에 조회 한계를 알립니다. 중요도는 일정 제목/장소를 근거로 한 추정으로 설명합니다.
 3. `내일 오후 2시에 회의 추가해줘`를 입력하면 일정 정보가 표시됩니다. `확인하고 추가`를 누른 후 생성 권한에 동의해야 실제 일정이 만들어집니다.
-4. `답장 초안 만들어줘`는 최근 메일을 바탕으로 확인용 템플릿만 보여줍니다. 발송 기능은 없습니다.
+4. `답장 초안 만들어줘`는 최근 메일 제목과 미리보기를 근거로 OpenAI가 검토용 초안을 작성합니다. 발송 기능은 없습니다.
 
 토큰은 JavaScript 메모리에만 보관하며 새로고침하면 사라집니다. `연결 해제`는 메모리의 토큰을 지우고 Google에 취소를 요청합니다. 메일·일정 결과도 새로고침하거나 연결을 해제하면 화면에서 사라집니다.
 
 ## 검증 기준
 
-- 목표 KPI: 명령 5종(일정 조회/생성, 메일 검색/요약, 답장 초안)이 입력에 따라 각각 분류되고, 일정 생성은 확인 전 API 요청 0건.
+- 목표 KPI: 명령 5종이 입력에 따라 각각 분류되고, 3개월 요청에서 실제 조회 기간 3개월을 유지하며 일정 생성은 확인 전 쓰기 요청 0건.
 - OKR 연결: 일정과 메일을 한 화면에서 처리하는 개인 비서 MVP의 핵심 흐름 완성.
-- 평가셋: Google 테스트 계정 1개, 오늘/이번 주 일정 각 1건, 최근·중요 메일 각 1건, 정상 권한과 거부/만료/빈 결과 조건. 브라우저에서 5개 명령과 확인/취소 흐름을 실행.
-- Before/After: 신규 프로젝트라 도입 전 측정값은 없습니다. 실행 결과는 테스트 계정과 OAuth Client ID를 설정한 뒤 기록합니다.
-- 합격 기준: `npm run build` 성공, 5개 명령 결과 표시, 생성 취소 시 Google Calendar 변경 0건, 에러 상황 한국어 안내 표시.
+- 평가셋: `python -m unittest discover -s tests -v`의 14개 회귀 사례(기간·월말·빈 결과·다음 달 일정·생성 확인·인증·API 오류), `npm test`의 Calendar 5개 사례(3개월 Google 쿼리·페이지·500건 상한·권한/중간 페이지 실패·잘못된 기간), 실제 OpenAI 질문/가상 면접 smoke, Google 테스트 계정의 실제 캘린더/메일 5개 명령 및 확인/취소.
+- Before/After: 변경 전 원문 질문은 `period=today`로 분류됨. 변경 후 실제 OpenAI 호출은 `calendar_read`, `importantOnly=true`, `앞으로 3개월`로 분류되며 가상 다음 달 면접을 답변에 포함함. 로컬 회귀 Python 14/14·Calendar 5/5와 프런트 빌드 통과. 실제 사용자 Google 데이터 E2E는 로그인한 브라우저에서 별도 확인 필요.
+- 합격 기준: 회귀 14/14, `npm run build` 성공, 실제 OpenAI smoke 성공, 인증 없는 운영 API 401, 5개 명령 결과 표시와 생성 취소 시 Calendar 변경 0건. API smoke는 `PYTHONPATH=. python tests/smoke_assistant_live.py`로 실행하며 소량의 OpenAI 비용이 발생합니다.
