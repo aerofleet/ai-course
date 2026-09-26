@@ -19,15 +19,26 @@ class LunarTests(unittest.TestCase):
                 self.assertEqual(selected[0]['start'], '2026-11-10')
                 self.assertNotIn('변환 보류', text)
 
-    def test_marker_only_parentheses_never_guess_date(self):
+    def test_marker_only_timed_event_preserves_local_time_and_source(self):
+        self.events = [{'id': 'mother', 'title': '장모님 생신(음력)', 'start': '2026-11-10T06:30:00Z', 'end': '2026-11-10T07:30:00Z'}]
+        before = copy.deepcopy(self.events)
+        command = {**self.previous, 'convertLunar': True}
+        text, selected = calendar_answer(self.data(command))
+        self.assertEqual(selected[0]['start'], '2026-12-18T15:30:00+09:00')
+        self.assertEqual(selected[0]['end'], '2026-12-18T16:30:00+09:00')
+        self.assertEqual(self.events, before)
+        self.assertEqual(calendar_answer(self.data(command)), (text, selected))
+
+    def test_marker_only_uses_registered_month_day(self):
         for title in ['장모님 생신(음력)', '장모님 생신（음력）', '장모님 생신( 음 력 )']:
             with self.subTest(title=title):
                 self.events = [{'id': 'mother', 'title': title, 'start': '2026-11-10', 'end': '2026-11-11'}]
                 text, selected = calendar_answer(self.data({**self.previous, 'convertLunar': True}))
-                self.assertIn('변환 보류', text)
-                self.assertEqual(selected[0]['start'], '2026-11-10')
+                self.assertNotIn('변환 보류', text)
+                self.assertEqual(selected[0]['start'], '2026-12-18')
+                self.assertIn('등록일 11/10을 음력 월·일로', text)
 
-    def test_pasted_card_targets_only_mother_and_asks_specific_question(self):
+    def test_pasted_card_targets_only_mother_and_converts(self):
         question = '- 2026-11-10 (화) 15:30–16:30 · 장모님 생신(음력) 이거 양력으로 변경해줘'
         command = self.interpret(question, self.model(convertLunar=True, reusePrevious=True))
         self.assertEqual(command['inspectTitle'], '장모님 생신(음력)')
@@ -35,8 +46,8 @@ class LunarTests(unittest.TestCase):
         text, selected = calendar_answer(self.data(command))
         self.assertEqual([item['id'] for item in selected], ['mother'])
         self.assertNotIn('장인', text)
-        self.assertNotIn('조건에 맞는', text)
-        self.assertIn('음력 생신 월·일', text)
+        self.assertEqual(selected[0]['start'], '2026-12-18')
+        self.assertNotIn('변환 보류', text)
 
     def test_missing_date_reply_continues_specific_conversion(self):
         self.previous.update(inspectTitle='장모님 생신(음력)', convertLunar=True)
@@ -69,7 +80,7 @@ class LunarTests(unittest.TestCase):
         father = next(item for item in selected if item['id'] == 'father')
         self.assertEqual(father['start'], '2026-11-18T10:30:00+09:00')
         self.assertEqual(father['end'], '2026-11-18T11:30:00+09:00')
-        self.assertIn('변환 보류', text)
+        self.assertNotIn('변환 보류', text)
         self.assertEqual(self.events, source)
         self.assertEqual(calendar_answer(self.data(command)), (text, selected))
 

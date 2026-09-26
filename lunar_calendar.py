@@ -18,19 +18,21 @@ def convert_events(events, command, zone):
             result.append(event)
             continue
         match = re.search(r'음력[\s():：\[\]{}]*\s*(윤달|윤|평달|평)?\s*(\d{1,2})\s*(?:/|월|\.)\s*(\d{1,2})', text)
-        if not match and not override:
-            event['conversionNote'] = '변환 보류: 음력 월·일과 평달/윤달을 알려 주세요. 등록일을 유지했습니다.'
-            result.append(event)
-            continue
+        registered_basis = not match and not override
+        old = date.fromisoformat(source['start']) if len(source['start']) == 10 else datetime.fromisoformat(source['start'].replace('Z', '+00:00')).astimezone(zone).date()
         if override:
             month, day = override['month'], override['day']
             if not isinstance(month, int) or not isinstance(day, int) or not 1 <= month <= 12 or not 1 <= day <= 30 or override.get('leap') not in (True, False, None):
                 raise ValueError('invalid lunar date')
             explicit, leap = override.get('leap') is not None, override.get('leap') is True
-        else:
+        elif match:
             word, month, day = match.groups()
             explicit = bool(word) or bool(re.search(r'윤달|평달', text))
             leap = bool((word and word.startswith('윤')) or '윤달' in text)
+        else:
+            month, day = old.month, old.day
+            explicit = bool(re.search(r'윤달|평달', text))
+            leap = '윤달' in text
         candidates, ambiguous = [], False
         for year in range(first.year - 1, last.year + 1):
             dates = []
@@ -50,7 +52,6 @@ def convert_events(events, command, zone):
             notes.append(f'“{text}”: 유효한 음력 날짜가 조회 기간에 없어 변환 목록에서 제외했습니다.')
             continue
         solar, year, intercalation = candidates[0]
-        old = date.fromisoformat(source['start']) if len(source['start']) == 10 else datetime.fromisoformat(source['start'].replace('Z', '+00:00')).astimezone(zone).date()
         delta = timedelta(days=(solar - old).days)
         for key in ('start', 'end'):
             value = source.get(key)
@@ -62,5 +63,7 @@ def convert_events(events, command, zone):
             continue
         event['originalStart'] = source['start']
         event['conversionNote'] = f'음력 {year}-{int(month):02d}-{int(day):02d} ({"윤달" if intercalation else "평달"}) → 양력 {solar}' + (' · 이미 양력 등록일과 같습니다.' if old == solar else ' · 표시 날짜만 변환했습니다.')
+        if registered_basis:
+            event['conversionNote'] += f' · 제목의 음력 표기에 따라 등록일 {old.month}/{old.day}을 음력 월·일로 사용했습니다.'
         result.append(event)
     return result, notes

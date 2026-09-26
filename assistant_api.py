@@ -120,7 +120,7 @@ COMMAND_SCHEMA = object_schema({
 INTERPRET_PROMPT = """한국어 개인 비서의 명령을 구조화한다. 입력의 question은 명령이며 now/timezone은 기준 시각이다.
 후속 요청은 표현을 외우지 말고 context의 작업을 이어받아 처리한다. 이전 목록의 변환/재정리/표시 변경은 calendar_read, reusePrevious=true, range.kind=previous다.
 특정 일정의 양력 변환 요청은 inspectTitle에 그 일정 제목만 지정한다. 붙여 넣은 카드 날짜는 새 조회 기간이 아니다.
-음력 월·일이 추가 답변으로 주어지면 lunarDate에 기록하고 이전 inspectTitle과 조회 범위를 유지한다. lunarDate는 질문에서 명시된 음력 월·일만 사용한다. 없으면 null이다. 평달 leap=false, 윤달 true, 미지정 null. 등록된 양력 날짜를 음력 월·일로 가정하지 않는다.
+음력 월·일이 추가 답변으로 주어지면 lunarDate에 기록하고 이전 inspectTitle과 조회 범위를 유지한다. lunarDate는 질문에서 명시된 음력 월·일만 사용한다. 없으면 null이다. 평달 leap=false, 윤달 true, 미지정 null. 제목에 음력 표기만 있으면 서버가 등록일의 월·일을 음력 기준으로 사용하므로 월·일 누락을 이유로 질문하지 않는다.
 음력을 양력으로 바꾸어 표시하는 도구를 지원한다. convertLunar=true로 지정하고 날짜를 직접 계산하지 않는다. 이후 목록 요청에도 변환을 유지한다.
 일정 삭제/수정이나 메일 발송은 지원하지 않는다. 이런 요청은 unsupported=true, action=unknown과 구체적인 지원 한계 설명을 반환한다. 나머지는 unsupported=false.
 음력 변환은 캘린더 원본 변경이 아닌 조회 결과 표시 변환이다. 변환 요청에 이전 조회가 없으면 조회 대상/기간만 질문한다.

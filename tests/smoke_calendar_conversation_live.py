@@ -60,7 +60,8 @@ for question in ['음력은 양력 날짜로 변경해서 다시 추려줘', '�
     text, selected = calendar_answer({'command': command, 'events': events})
     father = next(item for item in selected if item['id'] == 'father')
     assert father['start'] == '2026-11-18T10:30:00+09:00', father
-    assert '변환 보류' in text, text
+    mother = next(item for item in selected if item['id'] == 'mother')
+    assert mother['start'] == '2026-12-18' and '변환 보류' not in text, text
     context['calendarCommand'] = command
     print({'lunar_followup': True, 'verified': True})
 command = interpret_command('생일 목록을 모두 삭제해줘', now=now, context=context)
@@ -73,7 +74,7 @@ assert command['inspectTitle'] == '장모님 생신(음력)', command
 assert command['range'] == context['calendarCommand']['range'], command
 text, selected = calendar_answer({'command': command, 'events': events})
 assert [item['id'] for item in selected] == ['mother'], selected
-assert '음력 생신 월·일' in text and '장인' not in text, text
+assert selected[0]['start'] == '2026-12-18' and '장인' not in text, text
 context['calendarCommand'] = command
 command = interpret_command('음력 10월 2일 평달이야', now=now, context=context)
 assert command['action'] == 'calendar_read' and command['reusePrevious'], command
@@ -82,3 +83,10 @@ text, selected = calendar_answer({'command': command, 'events': events})
 assert [item['id'] for item in selected] == ['mother'], selected
 assert selected[0]['start'] == '2026-11-10' and '변환 보류' not in text, text
 print({'specific_lunar_target_and_parameter_reply': True, 'conversation_cases_passed': 13})
+command = interpret_command('앞으로 3개월 일정중 생일과 기념일만 추려주는데 음력 날짜는 양력으로 변경해서 추려줘', now=now, context={})
+assert command['action'] == 'calendar_read' and command['convertLunar'], command
+assert set(command['categoryFilter']) == {'birthday', 'anniversary'}, command
+text, selected = calendar_answer({'command': command, 'events': events})
+assert next(item for item in selected if item['id'] == 'mother')['start'] == '2026-12-18', text
+assert len(selected) == 5 and '변환 보류' not in text, text
+print({'combined_birthday_anniversary_lunar_query': True, 'conversation_cases_passed': 14})

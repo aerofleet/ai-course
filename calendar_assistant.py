@@ -138,7 +138,7 @@ def calendar_answer(data):
             if event.get('location'):
                 lines.append(f'  장소: {event["location"]}')
     if command.get('convertLunar'):
-        lines.append('조회된 일정의 음력 월·일을 조회 기간 연도로 계산했습니다. Google Calendar 원본은 변경하지 않았습니다.')
+        lines.append('음력 표기 일정은 제목의 월·일을 사용하고, 월·일이 없으면 등록일의 월·일을 음력으로 해석했습니다. Google Calendar 원본은 변경하지 않았습니다.')
         lines.extend(notes)
     if scope.get('calendarCount'):
         lines.append(f'조회한 캘린더: {scope["calendarCount"]}개')
